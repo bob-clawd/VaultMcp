@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VaultMcp.Host", "src\VaultMcp.Host\VaultMcp.Host.csproj", "{0D74E2E4-9D90-4A45-B9F3-77F3185957F8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VaultMcp.Tools", "src\VaultMcp.Tools\VaultMcp.Tools.csproj", "{DA9879CA-A8D0-42C7-94E9-233467F421F1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VaultMcp.Tools.Tests", "tests\VaultMcp.Tools.Tests\VaultMcp.Tools.Tests.csproj", "{AEB5D4B5-2E08-45EF-8D5B-8A2D8928AC62}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0D74E2E4-9D90-4A45-B9F3-77F3185957F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0D74E2E4-9D90-4A45-B9F3-77F3185957F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0D74E2E4-9D90-4A45-B9F3-77F3185957F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0D74E2E4-9D90-4A45-B9F3-77F3185957F8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA9879CA-A8D0-42C7-94E9-233467F421F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA9879CA-A8D0-42C7-94E9-233467F421F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA9879CA-A8D0-42C7-94E9-233467F421F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA9879CA-A8D0-42C7-94E9-233467F421F1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AEB5D4B5-2E08-45EF-8D5B-8A2D8928AC62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AEB5D4B5-2E08-45EF-8D5B-8A2D8928AC62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AEB5D4B5-2E08-45EF-8D5B-8A2D8928AC62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AEB5D4B5-2E08-45EF-8D5B-8A2D8928AC62}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

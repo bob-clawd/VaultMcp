@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\VaultMcp.Tools\VaultMcp.Tools.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.3" />
+    <PackageReference Include="ModelContextProtocol" Version="1.0.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>VaultMcp</PackageId>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>vaultmcp</ToolCommandName>
+    <Version>0.1.0</Version>
+    <Authors>chrismo80</Authors>
+    <Description>Local-first MCP server for markdown knowledge bases.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/chrismo80/VaultMcp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/chrismo80/VaultMcp</RepositoryUrl>
+    <PackageOutputPath>../../.nupkg</PackageOutputPath>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>mcp;dotnet;knowledge-base;markdown;agent</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\assets\icon.png" Pack="true" PackagePath="\" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <!-- Bundled default embedding model assets (no manual downloads needed). -->
+    <None Include="models\**\*" Pack="true" PackagePath="tools\net10.0\any\models\" />
+  </ItemGroup>
+</Project>

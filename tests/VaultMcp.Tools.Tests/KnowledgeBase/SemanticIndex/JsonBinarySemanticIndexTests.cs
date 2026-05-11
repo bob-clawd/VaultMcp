@@ -1,0 +1,140 @@
+using Is.Assertions;
+using VaultMcp.Tools.KnowledgeBase.SemanticIndex;
+using Xunit;
+
+namespace VaultMcp.Tools.Tests.KnowledgeBase.SemanticIndex;
+
+public sealed class JsonBinarySemanticIndexTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "VaultMcp.Semantic.Tests", Guid.NewGuid().ToString("N"));
+
+    public JsonBinarySemanticIndexTests()
+        => Directory.CreateDirectory(_root);
+
+    [Fact]
+    public void Rebuild_creates_index_files_and_semantic_search_returns_top_hit()
+    {
+        WriteNote("workflows/invoice-flow.md", "# Invoice Flow\n\nInvoice approval and payment release.");
+        WriteNote("operations/shipping.md", "# Shipping\n\nParcel delivery and warehouse handling.");
+
+        var index = CreateIndex(new KeywordEmbeddingProvider("test-embed-v1"));
+
+        index.Rebuild();
+        var results = index.Search("invoice payment", 5);
+        var status = index.GetStatus();
+
+        File.Exists(Path.Combine(_root, ".vaultmcp", "semantic-index.json")).IsTrue();
+        File.Exists(Path.Combine(_root, ".vaultmcp", "semantic-vectors.bin")).IsTrue();
+        File.Exists(Path.Combine(_root, ".vaultmcp", "index-state.json")).IsTrue();
+        results.Count.Is(2);
+        results[0].Path.Is(Path.Combine("workflows", "invoice-flow.md"));
+        status.IndexPresent.IsTrue();
+        status.ChunkCount.Is(2);
+        status.IndexedFileCount.Is(2);
+    }
+
+    [Fact]
+    public void UpsertFile_replaces_changed_chunks_for_single_note()
+    {
+        var path = Path.Combine("workflows", "invoice-flow.md");
+        WriteNote(path, "# Invoice Flow\n\nInvoice approval and payment release.");
+        var index = CreateIndex(new KeywordEmbeddingProvider("test-embed-v1"));
+
+        index.Rebuild();
+
+        WriteNote(path, "# Invoice Flow\n\nWarehouse staging and package handling.");
+        index.UpsertFile(path);
+
+        var results = index.Search("warehouse package", 5);
+
+        results[0].Path.Is(path);
+        results[0].TextPreview.Contains("Warehouse staging", StringComparison.OrdinalIgnoreCase).IsTrue();
+    }
+
+    [Fact]
+    public void DeleteFile_removes_chunks_from_index()
+    {
+        WriteNote(Path.Combine("workflows", "invoice-flow.md"), "# Invoice Flow\n\nInvoice approval and payment release.");
+        WriteNote(Path.Combine("operations", "shipping.md"), "# Shipping\n\nParcel delivery and warehouse handling.");
+        var index = CreateIndex(new KeywordEmbeddingProvider("test-embed-v1"));
+
+        index.Rebuild();
+        index.DeleteFile(Path.Combine("workflows", "invoice-flow.md"));
+
+        var results = index.Search("invoice payment", 5);
+        var status = index.GetStatus();
+
+        results.Any(hit => string.Equals(hit.Path, Path.Combine("workflows", "invoice-flow.md"), StringComparison.OrdinalIgnoreCase)).IsFalse();
+        status.IndexedFileCount.Is(1);
+    }
+
+    [Fact]
+    public void Search_requires_rebuild_when_embedding_model_changes()
+    {
+        WriteNote("workflows/invoice-flow.md", "# Invoice Flow\n\nInvoice approval and payment release.");
+        CreateIndex(new KeywordEmbeddingProvider("test-embed-v1")).Rebuild();
+        var index = CreateIndex(new KeywordEmbeddingProvider("test-embed-v2"));
+
+        var exception = Record.Exception(() => index.Search("invoice", 5));
+
+        exception.IsNotNull();
+        exception.Is<SemanticIndexModelMismatchException>();
+    }
+
+    [Fact]
+    public void Chunker_creates_stable_heading_based_chunk_ids()
+    {
+        var content = "# Invoice Flow\n\n## Overview\nInvoice approval and release.\n\n## Rules\nOnly approved invoices may ship.";
+
+        var chunks = MarkdownChunker.Chunk(Path.Combine("workflows", "invoice-flow.md"), content, DateTimeOffset.UtcNow, 350, 240);
+
+        chunks.Count.Is(2);
+        chunks[0].Id.Is(Path.Combine("workflows", "invoice-flow.md#s0-overview:0"));
+        chunks[1].Id.Is(Path.Combine("workflows", "invoice-flow.md#s1-rules:0"));
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_root))
+            Directory.Delete(_root, recursive: true);
+    }
+
+    private JsonBinarySemanticIndex CreateIndex(IEmbeddingProvider embeddingProvider)
+        => new(
+            new SemanticIndexOptions(
+                _root,
+                Path.Combine(_root, ".vaultmcp"),
+                embeddingProvider.ProviderName,
+                embeddingProvider.ModelName,
+                string.Empty,
+                string.Empty,
+                350,
+                240),
+            embeddingProvider);
+
+    private void WriteNote(string relativePath, string content)
+    {
+        var fullPath = Path.Combine(_root, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        File.WriteAllText(fullPath, content);
+    }
+
+    private sealed class KeywordEmbeddingProvider(string modelName) : IEmbeddingProvider
+    {
+        public string ProviderName => "test";
+        public string ModelName => modelName;
+        public bool IsConfigured => true;
+
+        public float[] Embed(string text)
+        {
+            var normalized = text.ToLowerInvariant();
+            var finance = ContainsAny(normalized, "invoice", "payment", "billing", "approval") ? 1f : 0f;
+            var logistics = ContainsAny(normalized, "warehouse", "shipping", "parcel", "package") ? 1f : 0f;
+            var policy = ContainsAny(normalized, "rule", "policy", "approved") ? 1f : 0.1f;
+            return [finance, logistics, policy];
+        }
+
+        private static bool ContainsAny(string text, params string[] values)
+            => values.Any(value => text.Contains(value, StringComparison.OrdinalIgnoreCase));
+    }
+}
