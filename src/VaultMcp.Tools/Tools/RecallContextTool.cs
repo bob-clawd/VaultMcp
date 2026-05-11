@@ -38,7 +38,7 @@ public sealed class RecallContextTool
         _semanticIndex = semanticIndex;
     }
     [McpServerTool(Name = "recall_context", Title = "Recall Context")]
-    [Description("Recall stored repo knowledge for a query by combining term lookup, lexical note search, full note loading, and related-note expansion. Use this before asking the user to repeat domain context.")]
+    [Description("Default first retrieval tool for project, domain, and architecture knowledge. Combines term lookup, lexical note search, full note loading, related-note expansion, and optional semantic matches. Use this before asking the user to repeat domain context.")]
     public RecallContextResponse Execute(
         [Description("Domain term, workflow, rule, subsystem, or architecture concept to recall.")]
         string query,
