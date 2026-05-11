@@ -103,10 +103,15 @@ public sealed class RecallContextTool
                 .Select(path => _vault.GetNote(path, maxCharsPerNote))
                 .ToArray();
 
+            var loadedPaths = notes
+                .Select(note => note.Path)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             var relatedNotes = notes.Length == 0
                 ? []
                 : notes
                     .SelectMany(note => _vault.FindRelatedNotes(note.Path, maxMatches))
+                    .Where(result => !loadedPaths.Contains(result.Path))
                     .GroupBy(result => result.Path, StringComparer.OrdinalIgnoreCase)
                     .Select(group => group
                         .OrderByDescending(result => result.Score)

@@ -100,6 +100,10 @@ public sealed class CaptureLearningTool
                 {
                     _semanticIndex.UpsertFile(result.Path);
                 }
+                catch (EmbeddingProviderUnavailableException)
+                {
+                    // Lexical-only setups should still capture knowledge cleanly without noisy index warnings.
+                }
                 catch (Exception exception) when (exception is ArgumentException or ArgumentOutOfRangeException or IOException or SemanticIndexException)
                 {
                     indexError = VaultToolErrors.FromException(exception);

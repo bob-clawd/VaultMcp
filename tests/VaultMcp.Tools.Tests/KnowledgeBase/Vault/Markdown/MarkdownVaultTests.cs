@@ -91,6 +91,22 @@ public sealed class MarkdownVaultTests : IDisposable
     }
 
     [Fact]
+    public void GetNote_hides_internal_learning_hash_markers_from_returned_content()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "glossary"));
+        File.WriteAllText(
+            Path.Combine(_root, "glossary", "order.md"),
+            "# Order\n\n<!-- vaultmcp:learning-hash=abc123 -->\n\nUseful content.");
+
+        var vault = new MarkdownVault(_root);
+
+        var note = vault.GetNote(Path.Combine("glossary", "order.md"));
+
+        note.Content.Contains("vaultmcp:learning-hash", StringComparison.OrdinalIgnoreCase).IsFalse();
+        note.Content.Contains("Useful content.", StringComparison.Ordinal).IsTrue();
+    }
+
+    [Fact]
     public void GetNote_rejects_path_traversal()
     {
         Directory.CreateDirectory(_root);
@@ -152,6 +168,23 @@ public sealed class MarkdownVaultTests : IDisposable
         var results = vault.SearchNotes("fragile");
 
         results.Count.Is(1);
+        results[0].Excerpt.Contains("fragile order", StringComparison.OrdinalIgnoreCase).IsTrue();
+    }
+
+    [Fact]
+    public void SearchNotes_omits_internal_learning_hash_markers_from_excerpts()
+    {
+        Directory.CreateDirectory(_root);
+        File.WriteAllText(
+            Path.Combine(_root, "pricing.md"),
+            "# Pricing\n\n<!-- vaultmcp:learning-hash=abc123 -->\n\nThe fragile order exceeds the threshold.");
+
+        var vault = new MarkdownVault(_root);
+
+        var results = vault.SearchNotes("fragile");
+
+        results.Count.Is(1);
+        results[0].Excerpt.Contains("vaultmcp:learning-hash", StringComparison.OrdinalIgnoreCase).IsFalse();
         results[0].Excerpt.Contains("fragile order", StringComparison.OrdinalIgnoreCase).IsTrue();
     }
 
