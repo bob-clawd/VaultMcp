@@ -1,5 +1,6 @@
 using Is.Assertions;
 using VaultMcp.Tools.KnowledgeBase;
+using VaultMcp.Tools.KnowledgeBase.SemanticIndex;
 using VaultMcp.Tools.KnowledgeBase.Vault;
 using VaultMcp.Tools.KnowledgeBase.Vault.Markdown;
 using VaultMcp.Tools.Tools;
@@ -36,6 +37,27 @@ public sealed class CaptureLearningToolTests
         stub.LastCaptureLearning.IsNotNull();
         stub.LastCaptureLearning!.Aliases!.Count.Is(2);
         stub.LastCaptureLearning.Examples!.Count.Is(2);
+    }
+
+    [Fact]
+    public void Execute_ignores_unavailable_semantic_provider_for_successful_capture()
+    {
+        var captureResult = new VaultCaptureResult("glossary/order.md", "Order", "term", true, false, false, "Created new knowledge note.");
+        var stub = new StubKnowledgeVault(
+            new VaultStatus("/repo/docs/domain", true, 1, [".md"]),
+            [],
+            captureResult: captureResult);
+        var semanticIndex = new StubSemanticIndex(
+            new SemanticIndexStatus("/repo/docs/domain", "/repo/docs/domain/.vaultmcp", false, "none", "all-MiniLM-L6-v2", false, null, null, 0, 0, null),
+            upsertException: new EmbeddingProviderUnavailableException("embedding provider unavailable"));
+        var tool = new CaptureLearningTool(stub, semanticIndex);
+
+        var result = tool.Execute("term", "Order", "Canonical order term.");
+
+        result.Error.IsNull();
+        result.Result!.Created.IsTrue();
+        result.IndexError.IsNull();
+        semanticIndex.LastUpsertPath.Is("glossary/order.md");
     }
 
     [Fact]

@@ -23,6 +23,8 @@ internal static class VaultMarkdownParser
             bodyContent = remainingBody;
         }
 
+        bodyContent = StripInternalMarkers(bodyContent);
+
         var headings = ExtractHeadings(bodyContent);
         var title = headings.FirstOrDefault() ?? fallbackTitle;
         return new VaultParsedNote(rawContent, bodyContent, title, headings, frontmatter);
@@ -144,6 +146,19 @@ internal static class VaultMarkdownParser
         }
     }
 
+    public static string StripInternalMarkers(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return content;
+
+        var lines = content.Split('\n');
+        var filtered = lines
+            .Where(line => !IsInternalMarkerLine(line))
+            .ToArray();
+
+        return string.Join('\n', filtered);
+    }
+
     private static IReadOnlyList<string> ExtractHeadings(string bodyContent)
     {
         var headings = new List<string>();
@@ -159,6 +174,13 @@ internal static class VaultMarkdownParser
         }
 
         return headings;
+    }
+
+    private static bool IsInternalMarkerLine(string line)
+    {
+        var trimmed = line.Trim();
+        return trimmed.StartsWith("<!-- vaultmcp:learning-hash=", StringComparison.OrdinalIgnoreCase)
+            && trimmed.EndsWith("-->", StringComparison.Ordinal);
     }
 
     private static bool IsListKey(string key) =>

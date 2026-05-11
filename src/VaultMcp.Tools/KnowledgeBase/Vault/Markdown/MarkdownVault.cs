@@ -62,7 +62,7 @@ public sealed class MarkdownVault : IVault
             throw new FileNotFoundException($"Note '{relativePath}' was not found in the vault.", relativePath);
 
         var entry = GetIndexedNote(fullPath);
-        var content = ReadTextUtf8(fullPath, maxChars, out var truncated);
+        var content = VaultMarkdownParser.StripInternalMarkers(ReadTextUtf8(fullPath, maxChars, out var truncated));
         return new VaultNoteDocument(
             entry.RelativePath,
             entry.Title,

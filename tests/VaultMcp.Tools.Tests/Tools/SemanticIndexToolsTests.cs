@@ -113,7 +113,7 @@ public sealed class SemanticIndexToolsTests
     }
 
     [Fact]
-    public void AddVaultMcp_defaults_semantic_model_to_all_minilm_without_configuring_provider()
+    public void AddVaultMcp_defaults_semantic_model_to_all_minilm_and_uses_bundled_provider_when_available()
     {
         using var _ = new SemanticIndexEnvironmentScope();
         var services = new ServiceCollection();
@@ -123,8 +123,8 @@ public sealed class SemanticIndexToolsTests
         using var provider = services.BuildServiceProvider();
         var status = provider.GetRequiredService<ISemanticIndex>().GetStatus();
 
-        status.ProviderConfigured.IsFalse();
-        status.ProviderName.Is("none");
+        status.ProviderConfigured.IsTrue();
+        status.ProviderName.Is("onnx");
         status.ConfiguredEmbeddingModel.Is("all-MiniLM-L6-v2");
     }
 
