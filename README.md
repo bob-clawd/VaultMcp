@@ -57,11 +57,13 @@ docs/domain/
 
 Agents use that vault through a small retrieval/capture loop:
 
-1. `recall_context` or `search_notes`
+1. `recall_context` as the default first tool for project, domain, and architecture knowledge
 2. `get_note`
 3. `find_related_notes` if needed
 4. do the actual task
 5. `capture_learning` for durable new knowledge
+
+Use `search_notes` or `find_term` directly when the agent already knows the exact term, title, or phrase it wants to look up.
 
 That turns session memory into reviewable project memory.
 
@@ -70,14 +72,14 @@ That turns session memory into reviewable project memory.
 | Tool | Purpose |
 | --- | --- |
 | `get_note` | Load a markdown note by vault-relative path with an explicit character budget. |
-| `search_notes` | Lexical search across titles, paths, headings, aliases, tags, kind, and content. |
-| `find_term` | Glossary-style lookup for domain terms and aliases. |
-| `recall_context` | Higher-level retrieval entry point that combines term lookup, note search, note loading, related-note expansion, and optional semantic matches. |
-| `find_related_notes` | Find nearby notes through shared terms, tags, explicit links, and directory proximity. |
-| `capture_learning` | Persist durable learned repo knowledge into controlled markdown buckets. |
-| `semantic_search_notes` | Search persisted semantic note chunks after a semantic index has been built. |
-| `reindex_vault` | Rebuild the semantic index from markdown source files under the vault root. |
-| `index_status` | Show semantic provider and index status, including model, dimensions, chunk count, and warnings. |
+| `search_notes` | Exact lexical search across titles, paths, headings, aliases, tags, kind, and content. Best when the agent already knows the term or phrase it wants. |
+| `find_term` | Glossary-style lookup for canonical domain terms and aliases. |
+| `recall_context` | Default first retrieval tool. Combines term lookup, lexical note search, full note loading, related-note expansion, and optional semantic matches. |
+| `find_related_notes` | Expand from one known note into nearby notes via shared terms, tags, explicit links, and directory proximity. |
+| `capture_learning` | Persist durable, repo-relevant knowledge into controlled markdown buckets. Not for speculative, temporary, or chat-noise notes. |
+| `semantic_search_notes` | Specialized semantic retrieval over persisted note chunks after a semantic index exists. Useful for fuzzy or conceptual exploration, not the default first lookup. |
+| `reindex_vault` | Maintenance tool that rebuilds the semantic index from markdown source files under the vault root. Not routine retrieval workflow. |
+| `index_status` | Diagnostics tool for semantic provider and index health, including model, dimensions, chunk count, and warnings. |
 
 ## Knowledge model
 
@@ -100,6 +102,19 @@ Structured capture fields:
 - `decision` -> context, choice, consequence
 
 The important constraint is: **structured input still produces normal markdown notes**.
+
+Capture should stay disciplined. Good `capture_learning` inputs are:
+
+- durable repo knowledge another agent would likely need again
+- grounded in code, docs, tests, or repeated human guidance
+- specific enough to be reviewed and corrected later
+
+Bad `capture_learning` inputs are:
+
+- speculative guesses
+- temporary task status
+- duplicate restatements of existing notes
+- raw chat fragments or low-signal operational noise
 
 That keeps the output:
 
@@ -220,11 +235,17 @@ A practical way to start:
 A minimal retrieval loop:
 
 1. unfamiliar repo/domain question appears
-2. call `recall_context(query)`
+2. call `recall_context(query)` first
 3. read returned notes
-4. follow related notes if needed
+4. use `get_note`, `find_related_notes`, `search_notes`, or `find_term` for deeper drilldown when needed
 5. continue implementation / planning / answering
 6. persist durable new knowledge with `capture_learning`
+
+Operational guidance:
+
+- use `index_status` only when diagnosing semantic retrieval problems or checking provider readiness
+- use `reindex_vault` only when semantic retrieval is unavailable, stale, broken, after bulk vault changes, or when explicitly requested
+- use `semantic_search_notes` for conceptual or fuzzy exploration, not as the default retrieval entry point
 
 The useful part is the loop itself: retrieval and persistence reinforce each other across sessions.
 

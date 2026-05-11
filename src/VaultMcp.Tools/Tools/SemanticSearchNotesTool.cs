@@ -16,7 +16,7 @@ public sealed record SemanticSearchNotesResponse(
 public sealed class SemanticSearchNotesTool(IVault vault, ISemanticIndex semanticIndex)
 {
     [McpServerTool(Name = "semantic_search_notes", Title = "Semantic Search Notes")]
-    [Description("Search semantic note chunks using the persisted derived index. Use this for natural-language recall after running `reindex_vault`." )]
+    [Description("Specialized semantic retrieval over persisted note chunks. Use this for fuzzy or conceptual exploration after `reindex_vault`, not as the default first lookup." )]
     public SemanticSearchNotesResponse Execute(
         [Description("Natural-language semantic search query.")]
         string query,

@@ -12,7 +12,7 @@ public sealed record IndexStatusResponse(
 public sealed class IndexStatusTool(ISemanticIndex semanticIndex)
 {
     [McpServerTool(Name = "index_status", Title = "Index Status")]
-    [Description("Show semantic index provider and file status, including model, dimensions, chunk count, and warnings.")]
+    [Description("Diagnostics tool for semantic provider and index health. Use this to investigate semantic retrieval problems, provider readiness, model details, chunk count, and warnings.")]
     public IndexStatusResponse Execute()
     {
         try
