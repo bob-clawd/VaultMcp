@@ -52,6 +52,24 @@ public sealed class JsonBinarySemanticIndexTests : IDisposable
     }
 
     [Fact]
+    public void UpsertFile_accepts_non_native_directory_separators()
+    {
+        var path = Path.Combine("workflows", "invoice-flow.md");
+        WriteNote(path, "# Invoice Flow\n\nInvoice approval and payment release.");
+        var index = CreateIndex(new KeywordEmbeddingProvider("test-embed-v1"));
+
+        index.Rebuild();
+
+        WriteNote(path, "# Invoice Flow\n\nWarehouse staging and package handling.");
+        index.UpsertFile(WithForeignSeparators(path));
+
+        var results = index.Search("warehouse package", 5);
+
+        results[0].Path.Is(path);
+        results[0].TextPreview.Contains("Warehouse staging", StringComparison.OrdinalIgnoreCase).IsTrue();
+    }
+
+    [Fact]
     public void DeleteFile_removes_chunks_from_index()
     {
         WriteNote(Path.Combine("workflows", "invoice-flow.md"), "# Invoice Flow\n\nInvoice approval and payment release.");
@@ -131,6 +149,11 @@ public sealed class JsonBinarySemanticIndexTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         File.WriteAllText(fullPath, content);
     }
+
+    private static string WithForeignSeparators(string path)
+        => Path.DirectorySeparatorChar == '/'
+            ? path.Replace('/', '\\')
+            : path.Replace('\\', '/');
 
     private sealed class KeywordEmbeddingProvider(string modelName) : IEmbeddingProvider
     {

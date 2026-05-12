@@ -50,21 +50,22 @@ public sealed class JsonBinarySemanticIndex : ISemanticIndex
         {
             var current = LoadSnapshotOrEmpty();
             var fullPath = ResolvePath(relativePath);
+            var normalizedRelativePath = Path.GetRelativePath(_options.RootPath, fullPath);
             if (!File.Exists(fullPath))
             {
-                DeleteFileInternal(relativePath, current);
+                DeleteFileInternal(normalizedRelativePath, current);
                 return;
             }
 
             var rawContent = File.ReadAllText(fullPath);
             var contentHash = MarkdownChunker.Sha256Hex(rawContent);
-            if (current.State.Files.TryGetValue(relativePath, out var state) && string.Equals(state.ContentHash, contentHash, StringComparison.OrdinalIgnoreCase))
+            if (current.State.Files.TryGetValue(normalizedRelativePath, out var state) && string.Equals(state.ContentHash, contentHash, StringComparison.OrdinalIgnoreCase))
             {
                 _snapshot = current;
                 return;
             }
 
-            var updated = ReplaceFile(current, relativePath, rawContent, File.GetLastWriteTimeUtc(fullPath), DateTimeOffset.UtcNow);
+            var updated = ReplaceFile(current, normalizedRelativePath, rawContent, File.GetLastWriteTimeUtc(fullPath), DateTimeOffset.UtcNow);
             SaveSnapshot(updated);
             _snapshot = updated;
         }
@@ -76,7 +77,8 @@ public sealed class JsonBinarySemanticIndex : ISemanticIndex
 
         lock (_sync)
         {
-            DeleteFileInternal(relativePath, LoadSnapshotOrEmpty());
+            var fullPath = ResolvePath(relativePath);
+            DeleteFileInternal(Path.GetRelativePath(_options.RootPath, fullPath), LoadSnapshotOrEmpty());
         }
     }
 

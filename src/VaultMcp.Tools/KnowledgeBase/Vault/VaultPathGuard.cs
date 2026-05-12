@@ -11,16 +11,18 @@ internal static class VaultPathGuard
         ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
 
-        if (Path.IsPathRooted(relativePath))
+        var normalizedRootPath = Path.GetFullPath(rootPath);
+        var normalizedRelativePath = NormalizeRelativePath(relativePath);
+        if (Path.IsPathRooted(normalizedRelativePath) || LooksLikeWindowsAbsolutePath(normalizedRelativePath))
             throw new ArgumentException("Only vault-relative note paths are allowed.", nameof(relativePath));
 
-        var fullPath = Path.GetFullPath(Path.Combine(rootPath, relativePath));
-        var rootPrefix = rootPath.EndsWith(Path.DirectorySeparatorChar)
-            ? rootPath
-            : rootPath + Path.DirectorySeparatorChar;
+        var fullPath = Path.GetFullPath(Path.Combine(normalizedRootPath, normalizedRelativePath));
+        var rootPrefix = normalizedRootPath.EndsWith(Path.DirectorySeparatorChar)
+            ? normalizedRootPath
+            : normalizedRootPath + Path.DirectorySeparatorChar;
 
         if (!fullPath.StartsWith(rootPrefix, PathComparison) &&
-            !string.Equals(fullPath, rootPath, PathComparison))
+            !string.Equals(fullPath, normalizedRootPath, PathComparison))
         {
             throw new ArgumentException("The requested note path escapes the configured vault root.", nameof(relativePath));
         }
@@ -33,4 +35,13 @@ internal static class VaultPathGuard
 
         return fullPath;
     }
+
+    private static string NormalizeRelativePath(string relativePath)
+        => relativePath.Trim().Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
+
+    private static bool LooksLikeWindowsAbsolutePath(string path)
+        => path.Length >= 3 &&
+           char.IsLetter(path[0]) &&
+           path[1] == ':' &&
+           (path[2] == Path.DirectorySeparatorChar || path[2] == '/');
 }
