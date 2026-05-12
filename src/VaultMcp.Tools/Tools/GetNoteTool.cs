@@ -7,7 +7,7 @@ using VaultMcp.Tools.KnowledgeBase.Vault;
 namespace VaultMcp.Tools.Tools;
 
 public sealed record GetNoteResponse(
-    VaultNoteDocument? Note,
+    VaultContextNote? Note,
     ErrorInfo? Error = null)
 {
     public static GetNoteResponse AsError(ErrorInfo error) => new(null, error);
@@ -21,15 +21,15 @@ public sealed class GetNoteTool(IVault vault)
     public GetNoteResponse Execute(
         [Description("Vault-relative markdown path, for example 'glossary/order.md'.")]
         string path,
-        [Description("Maximum number of characters to return from the note content. Default: 12000.")]
-        int maxChars = 12000)
+        [Description("Maximum number of characters to return from the note content. Default: 4000.")]
+        int maxChars = 4000)
     {
         if (VaultToolErrors.ValidateReadableVault(vault) is { } vaultError)
             return GetNoteResponse.AsError(vaultError);
 
         try
         {
-            return new GetNoteResponse(vault.GetNote(path, maxChars));
+            return new GetNoteResponse(VaultToolPayloads.FromDocument(vault.GetNote(path, maxChars)));
         }
         catch (Exception exception) when (exception is ArgumentException or ArgumentOutOfRangeException or FileNotFoundException or DirectoryNotFoundException or IOException)
         {

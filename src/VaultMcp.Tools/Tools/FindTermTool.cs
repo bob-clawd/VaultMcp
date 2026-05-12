@@ -7,7 +7,7 @@ using VaultMcp.Tools.KnowledgeBase.Vault;
 namespace VaultMcp.Tools.Tools;
 
 public sealed record FindTermResponse(
-    IReadOnlyList<VaultSearchResult> Results,
+    IReadOnlyList<VaultMatch> Results,
     ErrorInfo? Error = null)
 {
     public static FindTermResponse AsError(ErrorInfo error) => new([], error);
@@ -21,15 +21,15 @@ public sealed class FindTermTool(IVault vault)
     public FindTermResponse Execute(
         [Description("Domain term to look up, for example 'Order Aggregate' or 'Tenant Boundary'.")]
         string term,
-        [Description("Maximum number of results to return. Default: 10.")]
-        int maxCount = 10)
+        [Description("Maximum number of results to return. Default: 3.")]
+        int maxCount = 3)
     {
         if (VaultToolErrors.ValidateReadableVault(vault) is { } vaultError)
             return FindTermResponse.AsError(vaultError);
 
         try
         {
-            return new FindTermResponse(vault.FindTerm(term, maxCount));
+            return new FindTermResponse(VaultToolPayloads.FromSearchResults(vault.FindTerm(term, maxCount)));
         }
         catch (Exception exception) when (exception is ArgumentException or ArgumentOutOfRangeException or DirectoryNotFoundException or IOException)
         {

@@ -7,7 +7,7 @@ using VaultMcp.Tools.KnowledgeBase.Vault;
 namespace VaultMcp.Tools.Tools;
 
 public sealed record FindRelatedNotesResponse(
-    IReadOnlyList<VaultSearchResult> Results,
+    IReadOnlyList<VaultMatch> Results,
     ErrorInfo? Error = null)
 {
     public static FindRelatedNotesResponse AsError(ErrorInfo error) => new([], error);
@@ -21,15 +21,15 @@ public sealed class FindRelatedNotesTool(IVault vault)
     public FindRelatedNotesResponse Execute(
         [Description("Vault-relative markdown path, for example 'workflows/invoice-flow.md'.")]
         string path,
-        [Description("Maximum number of related notes to return. Default: 5.")]
-        int maxCount = 5)
+        [Description("Maximum number of related notes to return. Default: 3.")]
+        int maxCount = 3)
     {
         if (VaultToolErrors.ValidateReadableVault(vault) is { } vaultError)
             return FindRelatedNotesResponse.AsError(vaultError);
 
         try
         {
-            return new FindRelatedNotesResponse(vault.FindRelatedNotes(path, maxCount));
+            return new FindRelatedNotesResponse(VaultToolPayloads.FromSearchResults(vault.FindRelatedNotes(path, maxCount)));
         }
         catch (Exception exception) when (exception is ArgumentException or ArgumentOutOfRangeException or FileNotFoundException or DirectoryNotFoundException or IOException)
         {

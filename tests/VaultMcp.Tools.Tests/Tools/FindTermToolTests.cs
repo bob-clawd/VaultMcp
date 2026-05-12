@@ -26,6 +26,6 @@ public sealed class FindTermToolTests
         response.Error.IsNull();
         response.Results.Count.Is(1);
         response.Results[0].Title.Is("Order");
-        response.Results[0].Score.Is(1200);
+        response.Results[0].Kind.IsNull();
     }
 }

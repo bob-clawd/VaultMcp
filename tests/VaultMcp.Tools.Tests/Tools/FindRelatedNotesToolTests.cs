@@ -26,6 +26,6 @@ public sealed class FindRelatedNotesToolTests
         response.Error.IsNull();
         response.Results.Count.Is(1);
         response.Results[0].Path.Is("workflows/invoice-correction.md");
-        response.Results[0].Score.Is(310);
+        response.Results[0].Excerpt.Is("…invoice correction…");
     }
 }
