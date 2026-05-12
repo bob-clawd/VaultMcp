@@ -23,9 +23,9 @@ public sealed class JsonBinarySemanticIndexTests : IDisposable
         var results = index.Search("invoice payment", 5);
         var status = index.GetStatus();
 
-        File.Exists(Path.Combine(_root, ".vaultmcp", "semantic-index.json")).IsTrue();
-        File.Exists(Path.Combine(_root, ".vaultmcp", "semantic-vectors.bin")).IsTrue();
-        File.Exists(Path.Combine(_root, ".vaultmcp", "index-state.json")).IsTrue();
+        File.Exists(Path.Combine(_root, ".vault", "semantic-index.json")).IsTrue();
+        File.Exists(Path.Combine(_root, ".vault", "semantic-vectors.bin")).IsTrue();
+        File.Exists(Path.Combine(_root, ".vault", "index-state.json")).IsTrue();
         results.Count.Is(2);
         results[0].Path.Is(Path.Combine("workflows", "invoice-flow.md"));
         status.IndexPresent.IsTrue();
@@ -115,7 +115,7 @@ public sealed class JsonBinarySemanticIndexTests : IDisposable
         => new(
             new SemanticIndexOptions(
                 _root,
-                Path.Combine(_root, ".vaultmcp"),
+                Path.Combine(_root, ".vault"),
                 embeddingProvider.ProviderName,
                 embeddingProvider.ModelName,
                 string.Empty,

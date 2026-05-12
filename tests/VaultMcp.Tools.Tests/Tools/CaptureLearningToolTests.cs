@@ -48,7 +48,7 @@ public sealed class CaptureLearningToolTests
             [],
             captureResult: captureResult);
         var semanticIndex = new StubSemanticIndex(
-            new SemanticIndexStatus("/repo/docs/domain", "/repo/docs/domain/.vaultmcp", false, "none", "all-MiniLM-L6-v2", false, null, null, 0, 0, null),
+            new SemanticIndexStatus("/repo/docs/domain", "/repo/docs/domain/.vault", false, "none", "all-MiniLM-L6-v2", false, null, null, 0, 0, null),
             upsertException: new EmbeddingProviderUnavailableException("embedding provider unavailable"));
         var tool = new CaptureLearningTool(stub, semanticIndex);
 

@@ -6,7 +6,7 @@ namespace VaultMcp.Tools.KnowledgeBase.SemanticIndex;
 internal static class EmbeddingModelPaths
 {
     public static string GetDefaultModelDirectory(string rootPath, string modelName)
-        => Path.Combine(rootPath, ".vaultmcp", "models", modelName);
+        => Path.Combine(rootPath, ".vault", "models", modelName);
 
     public static string GetBundledModelDirectory(string modelName)
     {

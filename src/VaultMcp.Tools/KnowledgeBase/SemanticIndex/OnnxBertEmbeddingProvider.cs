@@ -162,6 +162,6 @@ internal sealed class OnnxBertEmbeddingProvider : IEmbeddingProvider, IDisposabl
             return;
 
         throw new EmbeddingProviderUnavailableException(
-            $"local onnx embedding assets missing. Expected model at '{_modelPath}' and vocab at '{_vocabPath}'. Download all-MiniLM-L6-v2 into the vault .vaultmcp/models directory or configure VAULTMCP_EMBEDDINGS_MODEL_PATH and VAULTMCP_EMBEDDINGS_VOCAB_PATH.");
+            $"local onnx embedding assets missing. Expected model at '{_modelPath}' and vocab at '{_vocabPath}'. Download all-MiniLM-L6-v2 into the vault .vault/models directory or configure VAULTMCP_EMBEDDINGS_MODEL_PATH and VAULTMCP_EMBEDDINGS_VOCAB_PATH.");
     }
 }

@@ -112,7 +112,7 @@ public sealed class RecallContextToolTests
             ["glossary/order.md"] = new("glossary/order.md", "Order", "# Order\n\nCanonical order term.")
         };
         var semanticIndex = new StubSemanticIndex(
-            new SemanticIndexStatus("/repo/docs/domain", "/repo/docs/domain/.vaultmcp", true, "test", "test-model", true, "test-model", 3, 1, 1, DateTimeOffset.UtcNow),
+            new SemanticIndexStatus("/repo/docs/domain", "/repo/docs/domain/.vault", true, "test", "test-model", true, "test-model", 3, 1, 1, DateTimeOffset.UtcNow),
             [new SemanticSearchHit("chunk-1", "Glossary/Order.md", "Order", null, 0.91f, "Canonical order term.")]);
 
         var tool = new RecallContextTool(new StubKnowledgeVault(

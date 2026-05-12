@@ -388,7 +388,7 @@ public sealed class JsonBinarySemanticIndex : ISemanticIndex
         return Directory.EnumerateFiles(_options.RootPath, "*", SearchOption.AllDirectories)
             .Where(path =>
             {
-                if (path.Contains(Path.Combine(_options.RootPath, ".vaultmcp"), StringComparison.OrdinalIgnoreCase))
+                if (path.Contains(Path.Combine(_options.RootPath, ".vault"), StringComparison.OrdinalIgnoreCase))
                     return false;
 
                 var extension = Path.GetExtension(path);

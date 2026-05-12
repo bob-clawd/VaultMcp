@@ -57,7 +57,7 @@ public static class ServiceCollectionExtensions
 
         return new SemanticIndexOptions(
             rootPath,
-            Path.Combine(rootPath, ".vaultmcp"),
+            Path.Combine(rootPath, ".vault"),
             resolvedProvider,
             resolvedModel,
             resolvedModelPath,
@@ -71,7 +71,7 @@ public static class ServiceCollectionExtensions
         => options.ProviderName.ToLowerInvariant() switch
         {
             "onnx" or "local-onnx" or "local" => CreateOnnxEmbeddingProvider(options),
-            "none" or "disabled" => new UnavailableEmbeddingProvider("embedding provider unavailable. Download all-MiniLM-L6-v2 into .vaultmcp/models or configure VAULTMCP_EMBEDDINGS_PROVIDER=onnx with VAULTMCP_EMBEDDINGS_MODEL_PATH and VAULTMCP_EMBEDDINGS_VOCAB_PATH.", options.ProviderName, options.EmbeddingModel),
+            "none" or "disabled" => new UnavailableEmbeddingProvider("embedding provider unavailable. Download all-MiniLM-L6-v2 into .vault/models or configure VAULTMCP_EMBEDDINGS_PROVIDER=onnx with VAULTMCP_EMBEDDINGS_MODEL_PATH and VAULTMCP_EMBEDDINGS_VOCAB_PATH.", options.ProviderName, options.EmbeddingModel),
             _ => new UnavailableEmbeddingProvider($"embedding provider '{options.ProviderName}' is not supported yet.", options.ProviderName, options.EmbeddingModel)
         };
 

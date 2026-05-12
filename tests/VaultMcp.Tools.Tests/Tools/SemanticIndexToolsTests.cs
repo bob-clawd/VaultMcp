@@ -14,7 +14,7 @@ public sealed class SemanticIndexToolsTests
 {
     private static readonly SemanticIndexStatus ReadyStatus = new(
         "/repo/docs/domain",
-        "/repo/docs/domain/.vaultmcp",
+        "/repo/docs/domain/.vault",
         true,
         "test",
         "test-embed-v1",
@@ -132,9 +132,9 @@ public sealed class SemanticIndexToolsTests
     public void AddVaultMcp_uses_local_onnx_provider_when_assets_exist_in_default_location()
     {
         using var root = new SemanticIndexTestDirectory();
-        Directory.CreateDirectory(Path.Combine(root.Path, ".vaultmcp", "models", "all-MiniLM-L6-v2", "onnx"));
-        File.WriteAllText(Path.Combine(root.Path, ".vaultmcp", "models", "all-MiniLM-L6-v2", "onnx", "model_qint8_arm64.onnx"), string.Empty);
-        File.WriteAllText(Path.Combine(root.Path, ".vaultmcp", "models", "all-MiniLM-L6-v2", "vocab.txt"), string.Empty);
+        Directory.CreateDirectory(Path.Combine(root.Path, ".vault", "models", "all-MiniLM-L6-v2", "onnx"));
+        File.WriteAllText(Path.Combine(root.Path, ".vault", "models", "all-MiniLM-L6-v2", "onnx", "model_qint8_arm64.onnx"), string.Empty);
+        File.WriteAllText(Path.Combine(root.Path, ".vault", "models", "all-MiniLM-L6-v2", "vocab.txt"), string.Empty);
 
         using var _ = new SemanticIndexEnvironmentScope();
         var services = new ServiceCollection();

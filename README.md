@@ -131,7 +131,7 @@ Current implementation highlights:
 - explicit UTF-8 file I/O
 - frontmatter parsing for `kind`, `tags`, `aliases`, `related`, `confidence`
 - lexical scoring across path, title, headings, aliases, tags, kind, and body
-- optional persisted semantic index stored under `.vaultmcp/`
+- optional persisted semantic index stored under `.vault/`
 - deterministic learning hashes for idempotent `capture_learning` writes
 - explicit output budgets for `get_note` and `recall_context`
 
@@ -140,7 +140,7 @@ Current implementation highlights:
 Semantic retrieval stays derived and disposable:
 
 - markdown notes remain the source of truth
-- semantic metadata + vectors live under `.vaultmcp/`
+- semantic metadata + vectors live under `.vault/`
 - lexical retrieval keeps working when no embedding provider is configured
 
 The default semantic model name is currently:
@@ -150,7 +150,7 @@ The default semantic model name is currently:
 VaultMcp can use a direct local ONNX model for semantic indexing. By default it looks for files here below the configured vault root:
 
 ```text
-.vaultmcp/models/all-MiniLM-L6-v2/
+.vault/models/all-MiniLM-L6-v2/
   vocab.txt
   onnx/model_qint8_arm64.onnx
 ```
@@ -176,7 +176,7 @@ onnx/model_qint8_arm64.onnx
 
 Lexical retrieval still works when those ONNX assets are missing.
 
-Note: the published `vaultmcp` dotnet tool can also ship with a bundled default model. In that case semantic indexing is available out-of-the-box; the vault-local `.vaultmcp/models/...` location still works as an override.
+Note: the published `vaultmcp` dotnet tool can also ship with a bundled default model. In that case semantic indexing is available out-of-the-box; the vault-local `.vault/models/...` location still works as an override.
 
 ## Download helper for all-MiniLM-L6-v2
 
