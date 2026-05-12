@@ -98,6 +98,7 @@ public sealed class SemanticIndexToolsTests
         response.SemanticError.IsNull();
         response.SemanticMatches.Count.Is(1);
         response.SemanticMatches[0].Path.Is("workflows/order-flow.md");
+        response.Matches.Count.Is(2);
         response.Notes[0].Path.Is("workflows/order-flow.md");
     }
 

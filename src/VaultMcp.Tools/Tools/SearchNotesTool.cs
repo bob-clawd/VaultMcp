@@ -7,7 +7,7 @@ using VaultMcp.Tools.KnowledgeBase.Vault;
 namespace VaultMcp.Tools.Tools;
 
 public sealed record SearchNotesResponse(
-    IReadOnlyList<VaultSearchResult> Results,
+    IReadOnlyList<VaultMatch> Results,
     ErrorInfo? Error = null)
 {
     public static SearchNotesResponse AsError(ErrorInfo error) => new([], error);
@@ -21,15 +21,15 @@ public sealed class SearchNotesTool(IVault vault)
     public SearchNotesResponse Execute(
         [Description("Search query, for example a workflow name, business rule, invariant, or subsystem concept.")]
         string query,
-        [Description("Maximum number of results to return. Default: 10.")]
-        int maxCount = 10)
+        [Description("Maximum number of results to return. Default: 5.")]
+        int maxCount = 5)
     {
         if (VaultToolErrors.ValidateReadableVault(vault) is { } vaultError)
             return SearchNotesResponse.AsError(vaultError);
 
         try
         {
-            return new SearchNotesResponse(vault.SearchNotes(query, maxCount));
+            return new SearchNotesResponse(VaultToolPayloads.FromSearchResults(vault.SearchNotes(query, maxCount)));
         }
         catch (Exception exception) when (exception is ArgumentException or ArgumentOutOfRangeException or DirectoryNotFoundException or IOException)
         {

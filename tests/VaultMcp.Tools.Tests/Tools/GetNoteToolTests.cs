@@ -11,7 +11,12 @@ public sealed class GetNoteToolTests
     [Fact]
     public void Execute_returns_document_from_vault()
     {
-        var document = new VaultNoteDocument("glossary/order.md", "Order", "# Order\n\nBody");
+        var document = new VaultNoteDocument(
+            "glossary/order.md",
+            "Order",
+            "---\nkind: term\naliases:\n  - Purchase Order\n---\n# Order\n\nBody",
+            Kind: "term",
+            Aliases: ["Purchase Order"]);
         var stub = new StubKnowledgeVault(new VaultStatus("/repo/docs/domain", true, 1, [".md"]), [], document);
         var tool = new GetNoteTool(stub);
 
@@ -21,6 +26,8 @@ public sealed class GetNoteToolTests
         result.Note!.Path.Is("glossary/order.md");
         result.Note.Title.Is("Order");
         result.Note.Content.Is("# Order\n\nBody");
+        result.Note.Kind.Is("term");
+        result.Note.Aliases!.Single().Is("Purchase Order");
         stub.LastGetNoteMaxChars.Is(4000);
     }
 

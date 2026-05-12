@@ -26,7 +26,7 @@ public sealed class SearchNotesToolTests
         response.Error.IsNull();
         response.Results.Count.Is(1);
         response.Results[0].Path.Is("workflows/invoice-flow.md");
-        response.Results[0].Score.Is(245);
+        response.Results[0].Excerpt.Is("…Handles invoice correction…");
     }
 
     [Fact]

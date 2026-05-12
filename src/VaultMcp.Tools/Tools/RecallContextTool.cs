@@ -9,16 +9,15 @@ namespace VaultMcp.Tools.Tools;
 
 public sealed record RecallContextResponse(
     string Query,
-    IReadOnlyList<VaultSearchResult> TermMatches,
-    IReadOnlyList<VaultSearchResult> SearchMatches,
-    IReadOnlyList<SemanticSearchHit> SemanticMatches,
-    IReadOnlyList<VaultNoteDocument> Notes,
-    IReadOnlyList<VaultSearchResult> RelatedNotes,
+    IReadOnlyList<VaultMatch> Matches,
+    IReadOnlyList<VaultSemanticMatch> SemanticMatches,
+    IReadOnlyList<VaultContextNote> Notes,
+    IReadOnlyList<VaultMatch> RelatedNotes,
     ErrorInfo? Error = null,
     ErrorInfo? SemanticError = null)
 {
     public static RecallContextResponse AsError(string query, ErrorInfo error)
-        => new(query, [], [], [], [], [], error);
+        => new(query, [], [], [], [], error);
 }
 
 [McpServerToolType]
@@ -42,12 +41,12 @@ public sealed class RecallContextTool
     public RecallContextResponse Execute(
         [Description("Domain term, workflow, rule, subsystem, or architecture concept to recall.")]
         string query,
-        [Description("Maximum number of candidate matches to inspect from term lookup and search. Default: 5.")]
-        int maxMatches = 5,
-        [Description("Maximum number of full notes to load into the response. Default: 2.")]
-        int loadTopNotes = 2,
-        [Description("Maximum number of characters to load per note. Default: 8000.")]
-        int maxCharsPerNote = 8000)
+        [Description("Maximum number of lexical candidate matches to inspect. Default: 3.")]
+        int maxMatches = 3,
+        [Description("Maximum number of full notes to load into the response. Default: 1.")]
+        int loadTopNotes = 1,
+        [Description("Maximum number of characters to load per note. Default: 4000.")]
+        int maxCharsPerNote = 4000)
     {
         if (VaultToolErrors.ValidateReadableVault(_vault) is { } vaultError)
             return RecallContextResponse.AsError(query, vaultError);
@@ -79,6 +78,18 @@ public sealed class RecallContextTool
                 }
             }
 
+            var lexicalMatches = termMatches
+                .Concat(searchMatches)
+                .GroupBy(match => match.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group
+                    .OrderByDescending(match => match.Score)
+                    .ThenBy(match => match.Title, StringComparer.OrdinalIgnoreCase)
+                    .First())
+                .OrderByDescending(match => match.Score)
+                .ThenBy(match => match.Title, StringComparer.OrdinalIgnoreCase)
+                .Take(maxMatches)
+                .ToArray();
+
             var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var notePaths = new List<string>();
 
@@ -88,12 +99,7 @@ public sealed class RecallContextTool
                     notePaths.Add(semanticMatch.Path);
             }
 
-            foreach (var result in termMatches
-                         .Concat(searchMatches)
-                         .GroupBy(match => match.Path, StringComparer.OrdinalIgnoreCase)
-                         .Select(group => group.OrderByDescending(match => match.Score).First())
-                         .OrderByDescending(match => match.Score)
-                         .ThenBy(match => match.Title, StringComparer.OrdinalIgnoreCase))
+            foreach (var result in lexicalMatches)
             {
                 if (seenPaths.Add(result.Path))
                     notePaths.Add(result.Path);
@@ -122,7 +128,13 @@ public sealed class RecallContextTool
                     .Take(maxMatches)
                     .ToArray();
 
-            return new RecallContextResponse(query, termMatches, searchMatches, semanticMatches, notes, relatedNotes, SemanticError: semanticError);
+            return new RecallContextResponse(
+                query,
+                VaultToolPayloads.FromSearchResults(lexicalMatches),
+                VaultToolPayloads.FromSemanticHits(semanticMatches.Take(maxMatches)),
+                VaultToolPayloads.FromDocuments(notes),
+                VaultToolPayloads.FromSearchResults(relatedNotes),
+                SemanticError: semanticError);
         }
         catch (Exception exception) when (exception is ArgumentException or ArgumentOutOfRangeException or FileNotFoundException or DirectoryNotFoundException or IOException)
         {

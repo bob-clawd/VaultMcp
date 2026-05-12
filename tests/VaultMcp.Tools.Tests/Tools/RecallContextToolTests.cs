@@ -39,11 +39,12 @@ public sealed class RecallContextToolTests
             relatedResults: relatedResults,
             documentsByPath: documents));
 
-        var response = tool.Execute("order", maxCharsPerNote: 6000);
+        var response = tool.Execute("order", maxMatches: 5, loadTopNotes: 2, maxCharsPerNote: 6000);
 
         response.Error.IsNull();
-        response.TermMatches.Count.Is(1);
-        response.SearchMatches.Count.Is(2);
+        response.Matches.Count.Is(2);
+        response.Matches[0].Path.Is("glossary/order.md");
+        response.Matches[1].Path.Is("workflows/order-flow.md");
         response.Notes.Count.Is(2);
         response.Notes[0].Path.Is("glossary/order.md");
         response.Notes[1].Path.Is("workflows/order-flow.md");
@@ -81,7 +82,7 @@ public sealed class RecallContextToolTests
             relatedResults: relatedResults,
             documentsByPath: documents));
 
-        var response = tool.Execute("order", maxCharsPerNote: 6000);
+        var response = tool.Execute("order", maxMatches: 5, loadTopNotes: 2, maxCharsPerNote: 6000);
 
         response.RelatedNotes.Count.Is(1);
         response.RelatedNotes[0].Path.Is("invariants/order-boundary.md");
