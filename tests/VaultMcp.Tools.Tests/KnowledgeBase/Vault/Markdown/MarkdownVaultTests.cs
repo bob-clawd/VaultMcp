@@ -221,6 +221,20 @@ public sealed class MarkdownVaultTests : IDisposable
     }
 
     [Fact]
+    public void SearchNotes_matches_transliterated_query_against_umlaut_note()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "glossary"));
+        File.WriteAllText(Path.Combine(_root, "glossary", "fundstück.md"), "# Fundstück\n\nDas Fundstück wird im Archiv erfasst.");
+
+        var vault = new MarkdownVault(_root);
+
+        var results = vault.SearchNotes("Fundstueck");
+
+        results.Count.Is(1);
+        results[0].Path.Is(Path.Combine("glossary", "fundstück.md"));
+    }
+
+    [Fact]
     public void SearchNotes_prefers_exact_phrase_over_separate_term_hits()
     {
         Directory.CreateDirectory(Path.Combine(_root, "workflows"));
@@ -338,6 +352,22 @@ public sealed class MarkdownVaultTests : IDisposable
 
         results.Count.Is(2);
         results[0].Path.Is(Path.Combine("glossary", "order.md"));
+    }
+
+    [Fact]
+    public void FindTerm_matches_umlaut_query_against_transliterated_note()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "glossary"));
+        File.WriteAllText(
+            Path.Combine(_root, "glossary", "fundstueck.md"),
+            "---\nkind: term\n---\n# Fundstueck\n\nDas Fundstueck wird im Archiv erfasst.");
+
+        var vault = new MarkdownVault(_root);
+
+        var results = vault.FindTerm("Fundstück");
+
+        results.Count.Is(1);
+        results[0].Path.Is(Path.Combine("glossary", "fundstueck.md"));
     }
 
     [Fact]
