@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 
 namespace VaultMcp.Tools.KnowledgeBase.Search.Lexical;
@@ -10,6 +9,14 @@ internal static class LexicalSearchTextExtensions
         "the", "and", "oder", "und", "der", "die", "das", "with", "when", "from", "into", "this", "that", "than", "then",
         "have", "must", "should", "will", "uses", "used", "using", "after", "before", "through", "across", "flow", "note",
         "kind", "captured", "summary", "details", "domain"
+    ];
+
+    private static readonly KeyValuePair<string, string>[] GermanSearchReplacements =
+    [
+        new("ä", "ae"),
+        new("ö", "oe"),
+        new("ü", "ue"),
+        new("ß", "ss")
     ];
 
     public static string? FindBestSharedTerm(this VaultIndexedNote source, VaultIndexedNote candidate)
@@ -36,7 +43,7 @@ internal static class LexicalSearchTextExtensions
         if (string.IsNullOrWhiteSpace(content))
             return string.Empty;
 
-        var index = FindComparableIndex(content, query);
+        var index = content.IndexOf(query, StringComparison.OrdinalIgnoreCase);
         if (index < 0)
             return FirstNonEmptyLine(content);
 
@@ -97,7 +104,13 @@ internal static class LexicalSearchTextExtensions
     }
 
     internal static string NormalizeForComparison(this string value)
-        => BuildComparableText(value).Text.Trim();
+    {
+        var normalized = value.CollapseWhitespace().ToLowerInvariant();
+        foreach (var replacement in GermanSearchReplacements)
+            normalized = normalized.Replace(replacement.Key, replacement.Value, StringComparison.Ordinal);
+
+        return normalized;
+    }
 
     private static string FirstNonEmptyLine(string content)
     {
@@ -109,84 +122,6 @@ internal static class LexicalSearchTextExtensions
         }
 
         return string.Empty;
-    }
-
-    private static int FindComparableIndex(string text, string query)
-    {
-        var directIndex = text.IndexOf(query, StringComparison.OrdinalIgnoreCase);
-        if (directIndex >= 0)
-            return directIndex;
-
-        var normalizedQuery = query.NormalizeForComparison();
-        if (string.IsNullOrWhiteSpace(normalizedQuery))
-            return -1;
-
-        var comparable = BuildComparableText(text);
-        var comparableIndex = comparable.Text.IndexOf(normalizedQuery, StringComparison.OrdinalIgnoreCase);
-        return comparableIndex < 0 ? -1 : comparable.IndexMap[comparableIndex];
-    }
-
-    private static (string Text, List<int> IndexMap) BuildComparableText(string value)
-    {
-        var builder = new StringBuilder(value.Length);
-        var indexMap = new List<int>(value.Length);
-        var lastWasWhitespace = false;
-
-        for (var index = 0; index < value.Length; index++)
-        {
-            var ch = value[index];
-            if (char.IsWhiteSpace(ch))
-            {
-                if (lastWasWhitespace)
-                    continue;
-
-                builder.Append(' ');
-                indexMap.Add(index);
-                lastWasWhitespace = true;
-                continue;
-            }
-
-            AppendComparableCharacter(builder, indexMap, ch, index);
-            lastWasWhitespace = false;
-        }
-
-        return (builder.ToString(), indexMap);
-    }
-
-    private static void AppendComparableCharacter(StringBuilder builder, List<int> indexMap, char ch, int sourceIndex)
-    {
-        switch (char.ToLowerInvariant(ch))
-        {
-            case 'ä':
-                builder.Append("ae");
-                indexMap.Add(sourceIndex);
-                indexMap.Add(sourceIndex);
-                return;
-            case 'ö':
-                builder.Append("oe");
-                indexMap.Add(sourceIndex);
-                indexMap.Add(sourceIndex);
-                return;
-            case 'ü':
-                builder.Append("ue");
-                indexMap.Add(sourceIndex);
-                indexMap.Add(sourceIndex);
-                return;
-            case 'ß':
-                builder.Append("ss");
-                indexMap.Add(sourceIndex);
-                indexMap.Add(sourceIndex);
-                return;
-        }
-
-        foreach (var normalizedChar in ch.ToString().Normalize(NormalizationForm.FormD))
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(normalizedChar) == UnicodeCategory.NonSpacingMark)
-                continue;
-
-            builder.Append(char.ToLowerInvariant(normalizedChar));
-            indexMap.Add(sourceIndex);
-        }
     }
 
     private static void AddToken(StringBuilder builder, HashSet<string> terms)

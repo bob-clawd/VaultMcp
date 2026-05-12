@@ -39,7 +39,7 @@ internal static class LexicalSearchScoring
         {
             score += options.TermKindBoost;
 
-            if (note.Frontmatter.Aliases.Any(alias => alias.Equals(normalizedQuery, StringComparison.OrdinalIgnoreCase)))
+            if (note.Frontmatter.Aliases.Any(alias => alias.NormalizeForComparison().Equals(normalizedQuery, StringComparison.OrdinalIgnoreCase)))
                 score += options.ExactAliasOnTermBoost;
         }
 

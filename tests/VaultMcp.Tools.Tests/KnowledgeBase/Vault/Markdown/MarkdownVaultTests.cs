@@ -371,6 +371,26 @@ public sealed class MarkdownVaultTests : IDisposable
     }
 
     [Fact]
+    public void FindTerm_prefers_transliterated_alias_match_on_term_notes()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "glossary"));
+        Directory.CreateDirectory(Path.Combine(_root, "workflows"));
+        File.WriteAllText(
+            Path.Combine(_root, "glossary", "fundstueck.md"),
+            "---\nkind: term\naliases:\n - Fundstueck\n---\n# Fundstueck\n\nCanonical domain term.");
+        File.WriteAllText(
+            Path.Combine(_root, "workflows", "fundstueck-flow.md"),
+            "---\nkind: workflow\naliases:\n - Fundstueck\n---\n# Fundstueck Workflow\n\nDescribes the process.");
+
+        var vault = new MarkdownVault(_root);
+
+        var results = vault.FindTerm("Fundstück");
+
+        results.Count.Is(2);
+        results[0].Path.Is(Path.Combine("glossary", "fundstueck.md"));
+    }
+
+    [Fact]
     public void FindRelatedNotes_prefers_shared_terms_and_same_directory()
     {
         Directory.CreateDirectory(Path.Combine(_root, "workflows"));
