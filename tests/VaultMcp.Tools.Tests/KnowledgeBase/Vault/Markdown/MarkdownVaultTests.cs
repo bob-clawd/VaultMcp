@@ -107,6 +107,22 @@ public sealed class MarkdownVaultTests : IDisposable
     }
 
     [Fact]
+    public void GetNote_normalizes_crlf_when_stripping_internal_learning_hash_markers()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "glossary"));
+        File.WriteAllText(
+            Path.Combine(_root, "glossary", "order.md"),
+            "# Order\r\n\r\n<!-- vaultmcp:learning-hash=abc123 -->\r\n\r\nUseful content.\r\n");
+
+        var vault = new MarkdownVault(_root);
+
+        var note = vault.GetNote(Path.Combine("glossary", "order.md"));
+
+        note.Content.Contains('\r').IsFalse();
+        note.Content.Contains("Useful content.", StringComparison.Ordinal).IsTrue();
+    }
+
+    [Fact]
     public void GetNote_rejects_path_traversal()
     {
         Directory.CreateDirectory(_root);

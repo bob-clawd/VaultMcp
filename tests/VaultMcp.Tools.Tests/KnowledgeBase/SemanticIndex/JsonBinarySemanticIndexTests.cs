@@ -69,6 +69,18 @@ public sealed class JsonBinarySemanticIndexTests : IDisposable
     }
 
     [Fact]
+    public void UpsertFile_rejects_path_traversal()
+    {
+        var index = CreateIndex(new KeywordEmbeddingProvider("test-embed-v1"));
+
+        var exception = Record.Exception(() => index.UpsertFile(Path.Combine("..", "secrets.md")));
+
+        exception.IsNotNull();
+        exception.Is<ArgumentException>();
+        exception.Message.Contains("escapes the configured vault root", StringComparison.Ordinal).IsTrue();
+    }
+
+    [Fact]
     public void Search_requires_rebuild_when_embedding_model_changes()
     {
         WriteNote("workflows/invoice-flow.md", "# Invoice Flow\n\nInvoice approval and payment release.");
@@ -109,7 +121,8 @@ public sealed class JsonBinarySemanticIndexTests : IDisposable
                 string.Empty,
                 string.Empty,
                 350,
-                240),
+                240,
+                SemanticSearchScoringOptions.Default),
             embeddingProvider);
 
     private void WriteNote(string relativePath, string content)

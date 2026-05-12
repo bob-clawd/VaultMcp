@@ -1,5 +1,6 @@
 using System.Text.Json;
 using VaultMcp.Tools.KnowledgeBase.Search.Lexical;
+using VaultMcp.Tools.KnowledgeBase.Vault;
 
 namespace VaultMcp.Tools.KnowledgeBase.SemanticIndex;
 
@@ -396,39 +397,21 @@ public sealed class JsonBinarySemanticIndex : ISemanticIndex
     }
 
     private string ResolvePath(string relativePath)
-    {
-        if (Path.IsPathRooted(relativePath))
-            throw new ArgumentException("Only vault-relative note paths are allowed.", nameof(relativePath));
-
-        var fullPath = Path.GetFullPath(Path.Combine(_options.RootPath, relativePath));
-        var rootPrefix = _options.RootPath.EndsWith(Path.DirectorySeparatorChar)
-            ? _options.RootPath
-            : _options.RootPath + Path.DirectorySeparatorChar;
-
-        if (!fullPath.StartsWith(rootPrefix, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) &&
-            !string.Equals(fullPath, _options.RootPath, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
-        {
-            throw new ArgumentException("The requested note path escapes the configured vault root.", nameof(relativePath));
-        }
-
-        return fullPath;
-    }
+        => VaultPathGuard.ResolvePath(_options.RootPath, relativePath);
 
     private static void ReplaceAtomically(string tempPath, string finalPath)
-    {
-        if (File.Exists(finalPath))
-            File.Delete(finalPath);
+        => File.Move(tempPath, finalPath, overwrite: true);
 
-        File.Move(tempPath, finalPath);
-    }
-
-    private static float ScoreChunk(ChunkIndexEntry chunk, float[] vector, string query, HashSet<string> queryTerms, float[] queryEmbedding)
+    private float ScoreChunk(ChunkIndexEntry chunk, float[] vector, string query, HashSet<string> queryTerms, float[] queryEmbedding)
     {
         var semanticScore = CosineSimilarity(queryEmbedding, vector);
         var lexicalScore = ComputeLexicalScore(queryTerms, chunk);
         var metadataBoost = ComputeMetadataBoost(query, chunk);
+        var scoring = _options.EffectiveScoring;
 
-        return (0.75f * semanticScore) + (0.15f * lexicalScore) + (0.10f * metadataBoost);
+        return (scoring.SemanticWeight * semanticScore) +
+               (scoring.LexicalWeight * lexicalScore) +
+               (scoring.MetadataWeight * metadataBoost);
     }
 
     private static float ComputeLexicalScore(HashSet<string> queryTerms, ChunkIndexEntry chunk)

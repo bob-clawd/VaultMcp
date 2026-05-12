@@ -1,5 +1,6 @@
 using Is.Assertions;
 using VaultMcp.Tools.KnowledgeBase;
+using VaultMcp.Tools.KnowledgeBase.SemanticIndex;
 using VaultMcp.Tools.KnowledgeBase.Vault;
 using VaultMcp.Tools.Tools;
 using Xunit;
@@ -97,5 +98,32 @@ public sealed class RecallContextToolTests
 
         response.Error!.Message.Is("vault root not found");
         response.Notes.Count.Is(0);
+    }
+
+    [Fact]
+    public void Execute_deduplicates_semantic_and_lexical_matches_case_insensitively()
+    {
+        var searchResults = new[]
+        {
+            new VaultSearchResult("glossary/order.md", "Order", "# Order", 950)
+        };
+        var documents = new Dictionary<string, VaultNoteDocument>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["glossary/order.md"] = new("glossary/order.md", "Order", "# Order\n\nCanonical order term.")
+        };
+        var semanticIndex = new StubSemanticIndex(
+            new SemanticIndexStatus("/repo/docs/domain", "/repo/docs/domain/.vaultmcp", true, "test", "test-model", true, "test-model", 3, 1, 1, DateTimeOffset.UtcNow),
+            [new SemanticSearchHit("chunk-1", "Glossary/Order.md", "Order", null, 0.91f, "Canonical order term.")]);
+
+        var tool = new RecallContextTool(new StubKnowledgeVault(
+            new VaultStatus("/repo/docs/domain", true, 1, [".md"]),
+            [],
+            searchResults: searchResults,
+            documentsByPath: documents), semanticIndex);
+
+        var response = tool.Execute("order", loadTopNotes: 5, maxCharsPerNote: 6000);
+
+        response.Notes.Count.Is(1);
+        response.Notes[0].Path.Is("glossary/order.md");
     }
 }

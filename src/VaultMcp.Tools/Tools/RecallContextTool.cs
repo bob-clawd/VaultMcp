@@ -79,11 +79,12 @@ public sealed class RecallContextTool
                 }
             }
 
+            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var notePaths = new List<string>();
 
             foreach (var semanticMatch in semanticMatches)
             {
-                if (!notePaths.Any(path => string.Equals(path, semanticMatch.Path, StringComparison.OrdinalIgnoreCase)))
+                if (seenPaths.Add(semanticMatch.Path))
                     notePaths.Add(semanticMatch.Path);
             }
 
@@ -94,7 +95,7 @@ public sealed class RecallContextTool
                          .OrderByDescending(match => match.Score)
                          .ThenBy(match => match.Title, StringComparer.OrdinalIgnoreCase))
             {
-                if (!notePaths.Any(path => string.Equals(path, result.Path, StringComparison.OrdinalIgnoreCase)))
+                if (seenPaths.Add(result.Path))
                     notePaths.Add(result.Path);
             }
 
