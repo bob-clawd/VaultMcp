@@ -5,7 +5,7 @@ using VaultMcp.Tools.KnowledgeBase.Search.Lexical;
 
 namespace VaultMcp.Tools.KnowledgeBase.Vault.Markdown;
 
-public sealed class MarkdownVault : IVault
+public sealed class MarkdownVault : IVault, IDisposable
 {
     private const int DefaultGetNoteMaxChars = 12000;
     private const int MaxIndexedCharacters = 64000;
@@ -17,6 +17,8 @@ public sealed class MarkdownVault : IVault
     private readonly string _rootPath;
     private readonly StringComparer _pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
     private Dictionary<string, VaultIndexedNote> _index = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+    private FileSystemWatcher? _watcher;
+    private bool _indexDirty = true;
 
     public MarkdownVault(string rootPath)
         : this(rootPath, new LexicalSearch())
@@ -30,6 +32,8 @@ public sealed class MarkdownVault : IVault
 
         _rootPath = Path.GetFullPath(rootPath);
         _search = search;
+
+        EnsureWatcher();
     }
 
     public VaultStatus GetStatus()
@@ -118,28 +122,54 @@ public sealed class MarkdownVault : IVault
 
     private IReadOnlyList<VaultIndexedNote> GetIndexedNotes()
     {
+        Dictionary<string, VaultIndexedNote> currentIndex;
+
         lock (_sync)
         {
-            var currentFiles = EnumerateFiles().ToArray();
-            var nextIndex = new Dictionary<string, VaultIndexedNote>(_pathComparer);
+            EnsureWatcher();
 
-            foreach (var path in currentFiles)
+            if (!_indexDirty)
+                return _index.Values.ToArray();
+
+            currentIndex = new Dictionary<string, VaultIndexedNote>(_index, _pathComparer);
+        }
+
+        var nextIndex = BuildIndexSnapshot(currentIndex);
+
+        lock (_sync)
+        {
+            EnsureWatcher();
+
+            if (_indexDirty)
             {
-                var info = new FileInfo(path);
-                if (_index.TryGetValue(path, out var existing) &&
-                    existing.LastWriteTimeUtc == info.LastWriteTimeUtc &&
-                    existing.FileSizeBytes == info.Length)
-                {
-                    nextIndex[path] = existing;
-                    continue;
-                }
-
-                nextIndex[path] = LoadIndexedNote(path, info);
+                _index = nextIndex;
+                _indexDirty = false;
             }
 
-            _index = nextIndex;
             return _index.Values.ToArray();
         }
+    }
+
+    private Dictionary<string, VaultIndexedNote> BuildIndexSnapshot(IReadOnlyDictionary<string, VaultIndexedNote> currentIndex)
+    {
+        var currentFiles = EnumerateFiles().ToArray();
+        var nextIndex = new Dictionary<string, VaultIndexedNote>(_pathComparer);
+
+        foreach (var path in currentFiles)
+        {
+            var info = new FileInfo(path);
+            if (currentIndex.TryGetValue(path, out var existing) &&
+                existing.LastWriteTimeUtc == info.LastWriteTimeUtc &&
+                existing.FileSizeBytes == info.Length)
+            {
+                nextIndex[path] = existing;
+                continue;
+            }
+
+            nextIndex[path] = LoadIndexedNote(path, info);
+        }
+
+        return nextIndex;
     }
 
     private VaultIndexedNote GetIndexedNote(string fullPath)
@@ -197,14 +227,92 @@ public sealed class MarkdownVault : IVault
     {
         lock (_sync)
         {
+            EnsureWatcher();
+
             if (!File.Exists(fullPath))
             {
                 _index.Remove(fullPath);
+                _indexDirty = true;
                 return;
             }
 
             var info = new FileInfo(fullPath);
             _index[fullPath] = LoadIndexedNote(fullPath, info);
+            _indexDirty = true;
+        }
+    }
+
+    private void EnsureWatcher()
+    {
+        if (_watcher is not null || !Directory.Exists(_rootPath))
+            return;
+
+        _watcher = new FileSystemWatcher(_rootPath)
+        {
+            IncludeSubdirectories = true,
+            NotifyFilter = NotifyFilters.DirectoryName | NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size
+        };
+
+        _watcher.Changed += OnFileSystemChanged;
+        _watcher.Created += OnFileSystemChanged;
+        _watcher.Deleted += OnFileSystemChanged;
+        _watcher.Renamed += OnFileSystemRenamed;
+        _watcher.Error += OnWatcherError;
+        _watcher.EnableRaisingEvents = true;
+    }
+
+    private void OnFileSystemChanged(object sender, FileSystemEventArgs args)
+    {
+        if (ShouldInvalidateForPath(args.FullPath))
+            MarkIndexDirty();
+    }
+
+    private void OnFileSystemRenamed(object sender, RenamedEventArgs args)
+    {
+        if (ShouldInvalidateForPath(args.FullPath) || ShouldInvalidateForPath(args.OldFullPath))
+            MarkIndexDirty();
+    }
+
+    private void OnWatcherError(object sender, ErrorEventArgs args)
+    {
+        lock (_sync)
+        {
+            if (_watcher is not null)
+            {
+                _watcher.Dispose();
+                _watcher = null;
+            }
+
+            _indexDirty = true;
+        }
+    }
+
+    private void MarkIndexDirty()
+    {
+        lock (_sync)
+        {
+            _indexDirty = true;
+        }
+    }
+
+    private static bool ShouldInvalidateForPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return true;
+
+        var extension = Path.GetExtension(path);
+        return string.IsNullOrEmpty(extension) || Extensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
+    }
+
+    public void Dispose()
+    {
+        lock (_sync)
+        {
+            if (_watcher is null)
+                return;
+
+            _watcher.Dispose();
+            _watcher = null;
         }
     }
 

@@ -1,3 +1,4 @@
+using System.Numerics.Tensors;
 using System.Text.Json;
 using VaultMcp.Tools.KnowledgeBase.Search.Lexical;
 using VaultMcp.Tools.KnowledgeBase.Vault;
@@ -463,16 +464,9 @@ public sealed class JsonBinarySemanticIndex : ISemanticIndex
         if (left.Length != right.Length)
             throw new ArgumentException("Vector dimensions must match for cosine similarity.");
 
-        float dot = 0;
-        float leftNorm = 0;
-        float rightNorm = 0;
-
-        for (var i = 0; i < left.Length; i++)
-        {
-            dot += left[i] * right[i];
-            leftNorm += left[i] * left[i];
-            rightNorm += right[i] * right[i];
-        }
+        var dot = TensorPrimitives.Dot(left, right);
+        var leftNorm = TensorPrimitives.Dot(left, left);
+        var rightNorm = TensorPrimitives.Dot(right, right);
 
         if (leftNorm == 0 || rightNorm == 0)
             return 0;
