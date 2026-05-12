@@ -16,7 +16,6 @@ public sealed class MarkdownVault : IVault
     private readonly object _sync = new();
     private readonly string _rootPath;
     private readonly StringComparer _pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-    private readonly StringComparison _pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
     private Dictionary<string, VaultIndexedNote> _index = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
     public MarkdownVault(string rootPath)
@@ -192,26 +191,7 @@ public sealed class MarkdownVault : IVault
     }
 
     private string ResolvePath(string relativePath)
-    {
-        if (Path.IsPathRooted(relativePath))
-            throw new ArgumentException("Only vault-relative note paths are allowed.", nameof(relativePath));
-
-        var fullPath = Path.GetFullPath(Path.Combine(_rootPath, relativePath));
-        var rootPrefix = _rootPath.EndsWith(Path.DirectorySeparatorChar)
-            ? _rootPath
-            : _rootPath + Path.DirectorySeparatorChar;
-
-        if (!fullPath.StartsWith(rootPrefix, _pathComparison) &&
-            !string.Equals(fullPath, _rootPath, _pathComparison))
-        {
-            throw new ArgumentException("The requested note path escapes the configured vault root.", nameof(relativePath));
-        }
-
-        if (!Extensions.Contains(Path.GetExtension(fullPath), StringComparer.OrdinalIgnoreCase))
-            throw new ArgumentException("Only markdown note paths are allowed.", nameof(relativePath));
-
-        return fullPath;
-    }
+        => VaultPathGuard.ResolvePath(_rootPath, relativePath, Extensions);
 
     private void RefreshIndex(string fullPath)
     {

@@ -63,7 +63,8 @@ public static class ServiceCollectionExtensions
             resolvedModelPath,
             resolvedVocabPath,
             MaxChunkWords: 350,
-            MaxPreviewChars: 240);
+            MaxPreviewChars: 240,
+            Scoring: SemanticSearchScoringOptions.Default);
     }
 
     private static IEmbeddingProvider CreateEmbeddingProvider(SemanticIndexOptions options)

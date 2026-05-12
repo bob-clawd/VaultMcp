@@ -151,10 +151,14 @@ internal static class VaultMarkdownParser
         if (string.IsNullOrWhiteSpace(content))
             return content;
 
-        var lines = content.Split('\n');
-        var filtered = lines
-            .Where(line => !IsInternalMarkerLine(line))
-            .ToArray();
+        using var reader = new StringReader(content);
+        var filtered = new List<string>();
+        string? line;
+        while ((line = reader.ReadLine()) is not null)
+        {
+            if (!IsInternalMarkerLine(line))
+                filtered.Add(line);
+        }
 
         return string.Join('\n', filtered);
     }
