@@ -64,7 +64,7 @@ internal static class LexicalSearchScoring
 
         foreach (var term in sharedTerms)
         {
-            if (LexicalSearchTextExtensions.NormalizeForComparison(candidate.RelativePath).Contains(term, StringComparison.OrdinalIgnoreCase))
+            if (candidate.RelativePath.NormalizeForComparison().Contains(term, StringComparison.OrdinalIgnoreCase))
                 score += options.SharedTermInPathBoost;
         }
 
@@ -85,7 +85,7 @@ internal static class LexicalSearchScoring
 
     private static int ScorePath(string relativePath, string query, IReadOnlyList<string> queryTerms, TextMatchScoringOptions options)
     {
-        var comparablePath = LexicalSearchTextExtensions.NormalizeForComparison(relativePath);
+        var comparablePath = relativePath.NormalizeForComparison();
         if (comparablePath.Equals(query, StringComparison.OrdinalIgnoreCase))
             return options.ExactMatchBoost;
         if (comparablePath.Contains(query, StringComparison.OrdinalIgnoreCase))
@@ -96,7 +96,7 @@ internal static class LexicalSearchScoring
 
     private static int ScoreText(string text, string query, IReadOnlyList<string> queryTerms, TextMatchScoringOptions options)
     {
-        var comparableText = LexicalSearchTextExtensions.NormalizeForComparison(text);
+        var comparableText = text.NormalizeForComparison();
         var score = 0;
 
         if (comparableText.Equals(query, StringComparison.OrdinalIgnoreCase))
@@ -113,7 +113,7 @@ internal static class LexicalSearchScoring
 
     private static int ScoreFileName(string fileName, string query, TextMatchScoringOptions options)
     {
-        var comparableFileName = LexicalSearchTextExtensions.NormalizeForComparison(fileName);
+        var comparableFileName = fileName.NormalizeForComparison();
         if (comparableFileName.Equals(query, StringComparison.OrdinalIgnoreCase))
             return options.ExactMatchBoost;
         if (comparableFileName.Contains(query, StringComparison.OrdinalIgnoreCase))
@@ -127,7 +127,7 @@ internal static class LexicalSearchScoring
         if (string.IsNullOrWhiteSpace(value))
             return 0;
 
-        var comparableValue = LexicalSearchTextExtensions.NormalizeForComparison(value);
+        var comparableValue = value.NormalizeForComparison();
         if (comparableValue.Equals(query, StringComparison.OrdinalIgnoreCase))
             return options.ExactMatchBoost;
         if (comparableValue.Contains(query, StringComparison.OrdinalIgnoreCase))
@@ -141,7 +141,7 @@ internal static class LexicalSearchScoring
         var score = 0;
         foreach (var value in values)
         {
-            var comparableValue = LexicalSearchTextExtensions.NormalizeForComparison(value);
+            var comparableValue = value.NormalizeForComparison();
             if (comparableValue.Equals(query, StringComparison.OrdinalIgnoreCase))
             {
                 score += options.ExactMatchBoost;
@@ -162,7 +162,7 @@ internal static class LexicalSearchScoring
         if (string.IsNullOrWhiteSpace(content))
             return 0;
 
-        var comparableContent = LexicalSearchTextExtensions.NormalizeForComparison(content);
+        var comparableContent = content.NormalizeForComparison();
         var score = 0;
         if (comparableContent.Equals(query, StringComparison.OrdinalIgnoreCase))
             score += options.ExactMatchBoost;
@@ -179,7 +179,7 @@ internal static class LexicalSearchScoring
         if (string.IsNullOrWhiteSpace(text) || queryTerms.Count == 0)
             return 0;
 
-        var comparableText = LexicalSearchTextExtensions.NormalizeForComparison(text);
+        var comparableText = text.NormalizeForComparison();
         var score = 0;
         foreach (var term in queryTerms)
         {
@@ -195,7 +195,7 @@ internal static class LexicalSearchScoring
         if (boost <= 0 || string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(query))
             return 0;
 
-        var comparableText = LexicalSearchTextExtensions.NormalizeForComparison(text);
+        var comparableText = text.NormalizeForComparison();
         var normalizedQuery = NormalizeQuery(query);
         if (!normalizedQuery.Contains(' ', StringComparison.Ordinal))
             return 0;
@@ -228,7 +228,7 @@ internal static class LexicalSearchScoring
         };
     }
 
-    private static string NormalizeQuery(string query) => LexicalSearchTextExtensions.NormalizeForComparison(query);
+    private static string NormalizeQuery(string query) => query.NormalizeForComparison();
 
     private static int CountOccurrences(string text, string query)
     {

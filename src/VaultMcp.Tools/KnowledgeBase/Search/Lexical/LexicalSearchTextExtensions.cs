@@ -21,7 +21,7 @@ internal static class LexicalSearchTextExtensions
                 return term;
         }
 
-        var comparableBody = NormalizeForComparison(candidate.BodyContent);
+        var comparableBody = candidate.BodyContent.NormalizeForComparison();
         foreach (var term in source.ExtractedTerms.OrderByDescending(t => t.Length))
         {
             if (comparableBody.Contains(term, StringComparison.OrdinalIgnoreCase))
@@ -43,7 +43,7 @@ internal static class LexicalSearchTextExtensions
         var start = Math.Max(0, index - LexicalSearchScoringOptions.Default.ExcerptRadius);
         var end = Math.Min(content.Length, index + query.Length + LexicalSearchScoringOptions.Default.ExcerptRadius);
         var snippet = content[start..end].Trim();
-        var collapsed = CollapseWhitespace(snippet);
+        var collapsed = snippet.CollapseWhitespace();
 
         if (start > 0)
             collapsed = "…" + collapsed;
@@ -58,7 +58,7 @@ internal static class LexicalSearchTextExtensions
         var terms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var builder = new StringBuilder();
 
-        foreach (var ch in NormalizeForComparison(value))
+        foreach (var ch in value.NormalizeForComparison())
         {
             if (char.IsLetterOrDigit(ch))
             {
@@ -73,7 +73,7 @@ internal static class LexicalSearchTextExtensions
         return terms;
     }
 
-    internal static string CollapseWhitespace(string value)
+    internal static string CollapseWhitespace(this string value)
     {
         var builder = new StringBuilder(value.Length);
         var lastWasWhitespace = false;
@@ -96,7 +96,7 @@ internal static class LexicalSearchTextExtensions
         return builder.ToString().Trim();
     }
 
-    internal static string NormalizeForComparison(string value)
+    internal static string NormalizeForComparison(this string value)
         => BuildComparableText(value).Text.Trim();
 
     private static string FirstNonEmptyLine(string content)
@@ -105,7 +105,7 @@ internal static class LexicalSearchTextExtensions
         {
             var trimmed = line.Trim();
             if (!string.IsNullOrWhiteSpace(trimmed))
-                return CollapseWhitespace(trimmed);
+                return trimmed.CollapseWhitespace();
         }
 
         return string.Empty;
@@ -117,7 +117,7 @@ internal static class LexicalSearchTextExtensions
         if (directIndex >= 0)
             return directIndex;
 
-        var normalizedQuery = NormalizeForComparison(query);
+        var normalizedQuery = query.NormalizeForComparison();
         if (string.IsNullOrWhiteSpace(normalizedQuery))
             return -1;
 
