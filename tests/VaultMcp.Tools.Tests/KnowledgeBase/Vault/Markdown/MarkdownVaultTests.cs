@@ -71,6 +71,20 @@ public sealed class MarkdownVaultTests : IDisposable
     }
 
     [Fact]
+    public void GetNote_accepts_non_native_directory_separators()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "workflows"));
+        File.WriteAllText(Path.Combine(_root, "workflows", "invoice-flow.md"), "# Invoice Flow\n\nStep 1");
+
+        var vault = new MarkdownVault(_root);
+
+        var note = vault.GetNote(WithForeignSeparators(Path.Combine("workflows", "invoice-flow.md")));
+
+        note.Path.Is(Path.Combine("workflows", "invoice-flow.md"));
+        note.Title.Is("Invoice Flow");
+    }
+
+    [Fact]
     public void GetNote_respects_frontmatter_and_max_chars_budget()
     {
         Directory.CreateDirectory(Path.Combine(_root, "glossary"));
@@ -359,6 +373,23 @@ public sealed class MarkdownVaultTests : IDisposable
     }
 
     [Fact]
+    public void FindRelatedNotes_accepts_non_native_directory_separators()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "workflows"));
+        Directory.CreateDirectory(Path.Combine(_root, "concepts"));
+        File.WriteAllText(Path.Combine(_root, "workflows", "invoice-flow.md"), "# Invoice Flow\n\nOrder validation happens before invoice correction.");
+        File.WriteAllText(Path.Combine(_root, "workflows", "invoice-correction.md"), "# Invoice Correction Flow\n\nInvoice correction starts after order validation.");
+        File.WriteAllText(Path.Combine(_root, "concepts", "tenant-boundary.md"), "# Tenant Boundary\n\nTenant segregation across exports.");
+
+        var vault = new MarkdownVault(_root);
+
+        var results = vault.FindRelatedNotes(WithForeignSeparators(Path.Combine("workflows", "invoice-flow.md")));
+
+        results.Count.Is(1);
+        results[0].Path.Is(Path.Combine("workflows", "invoice-correction.md"));
+    }
+
+    [Fact]
     public void FindRelatedNotes_prefers_explicit_related_links_over_shared_terms()
     {
         Directory.CreateDirectory(Path.Combine(_root, "workflows"));
@@ -606,6 +637,11 @@ public sealed class MarkdownVaultTests : IDisposable
 
         Assert.True(condition());
     }
+
+    private static string WithForeignSeparators(string path)
+        => Path.DirectorySeparatorChar == '/'
+            ? path.Replace('/', '\\')
+            : path.Replace('\\', '/');
 }
 
 internal sealed class StubSearch(
