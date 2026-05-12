@@ -2,6 +2,7 @@ using System.ComponentModel;
 using ModelContextProtocol.Server;
 using VaultMcp.Tools;
 using VaultMcp.Tools.KnowledgeBase;
+using VaultMcp.Tools.KnowledgeBase.Search.Lexical;
 using VaultMcp.Tools.KnowledgeBase.SemanticIndex;
 using VaultMcp.Tools.KnowledgeBase.Vault;
 
@@ -64,13 +65,18 @@ public sealed class RecallContextTool
             var termMatches = _vault.FindTerm(query, maxMatches);
             var searchMatches = _vault.SearchNotes(query, maxMatches);
 
+            var exactTermLookup = IsExactTermLookup(query, termMatches);
+            var semanticLimit = exactTermLookup ? 0 : Math.Min(maxMatches, 3);
+            var effectiveLoadTopNotes = exactTermLookup ? Math.Min(loadTopNotes, 1) : loadTopNotes;
+            var effectiveRelatedNotes = exactTermLookup ? Math.Min(maxMatches, 2) : maxMatches;
+
             ErrorInfo? semanticError = null;
             IReadOnlyList<SemanticSearchHit> semanticMatches = [];
-            if (_semanticIndex is not null)
+            if (_semanticIndex is not null && semanticLimit > 0)
             {
                 try
                 {
-                    semanticMatches = _semanticIndex.Search(query, maxMatches);
+                    semanticMatches = _semanticIndex.Search(query, semanticLimit);
                 }
                 catch (Exception exception) when (exception is ArgumentException or ArgumentOutOfRangeException or IOException or SemanticIndexException)
                 {
@@ -93,10 +99,13 @@ public sealed class RecallContextTool
             var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var notePaths = new List<string>();
 
-            foreach (var semanticMatch in semanticMatches)
+            if (!exactTermLookup)
             {
-                if (seenPaths.Add(semanticMatch.Path))
-                    notePaths.Add(semanticMatch.Path);
+                foreach (var semanticMatch in semanticMatches)
+                {
+                    if (seenPaths.Add(semanticMatch.Path))
+                        notePaths.Add(semanticMatch.Path);
+                }
             }
 
             foreach (var result in lexicalMatches)
@@ -105,8 +114,17 @@ public sealed class RecallContextTool
                     notePaths.Add(result.Path);
             }
 
+            if (exactTermLookup)
+            {
+                foreach (var semanticMatch in semanticMatches)
+                {
+                    if (seenPaths.Add(semanticMatch.Path))
+                        notePaths.Add(semanticMatch.Path);
+                }
+            }
+
             var notes = notePaths
-                .Take(loadTopNotes)
+                .Take(effectiveLoadTopNotes)
                 .Select(path => _vault.GetNote(path, maxCharsPerNote))
                 .ToArray();
 
@@ -119,20 +137,21 @@ public sealed class RecallContextTool
                 : notes
                     .SelectMany(note => _vault.FindRelatedNotes(note.Path, maxMatches))
                     .Where(result => !loadedPaths.Contains(result.Path))
+                    .Where(result => !lexicalMatches.Any(match => string.Equals(match.Path, result.Path, StringComparison.OrdinalIgnoreCase)))
                     .GroupBy(result => result.Path, StringComparer.OrdinalIgnoreCase)
                     .Select(group => group
                         .OrderByDescending(result => result.Score)
                         .First())
                     .OrderByDescending(result => result.Score)
                     .ThenBy(result => result.Title, StringComparer.OrdinalIgnoreCase)
-                    .Take(maxMatches)
+                    .Take(effectiveRelatedNotes)
                     .ToArray();
 
             return new RecallContextResponse(
                 query,
                 VaultToolPayloads.FromSearchResults(lexicalMatches),
-                VaultToolPayloads.FromSemanticHits(semanticMatches.Take(maxMatches)),
-                VaultToolPayloads.FromDocuments(notes),
+                VaultToolPayloads.FromSemanticHits(semanticMatches.Take(semanticLimit)),
+                VaultToolPayloads.FromContextDocuments(notes, query, maxCharsPerNote),
                 VaultToolPayloads.FromSearchResults(relatedNotes),
                 SemanticError: semanticError);
         }
@@ -140,5 +159,26 @@ public sealed class RecallContextTool
         {
             return RecallContextResponse.AsError(query, VaultToolErrors.FromException(exception));
         }
+    }
+
+    private static bool IsExactTermLookup(string query, IReadOnlyList<VaultSearchResult> termMatches)
+    {
+        if (termMatches.Count == 0)
+            return false;
+
+        var normalizedQuery = query.NormalizeForComparison();
+        var queryTerms = query.ExtractTerms();
+        if (queryTerms.Count > 3)
+            return false;
+
+        var top = termMatches[0];
+        if (!string.Equals(top.Kind, "term", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (top.Title.NormalizeForComparison().Equals(normalizedQuery, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var fileName = Path.GetFileNameWithoutExtension(top.Path);
+        return fileName.NormalizeForComparison().Equals(normalizedQuery, StringComparison.OrdinalIgnoreCase);
     }
 }

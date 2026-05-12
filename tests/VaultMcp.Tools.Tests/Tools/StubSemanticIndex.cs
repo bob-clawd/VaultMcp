@@ -11,6 +11,8 @@ internal sealed class StubSemanticIndex(
 {
     public string? LastUpsertPath { get; private set; }
     public int RebuildCalls { get; private set; }
+    public int SearchCalls { get; private set; }
+    public int? LastSearchLimit { get; private set; }
 
     public void Rebuild()
     {
@@ -32,6 +34,8 @@ internal sealed class StubSemanticIndex(
 
     public IReadOnlyList<SemanticSearchHit> Search(string query, int limit = 10)
     {
+        SearchCalls++;
+        LastSearchLimit = limit;
         if (searchException is not null)
             throw searchException;
 
