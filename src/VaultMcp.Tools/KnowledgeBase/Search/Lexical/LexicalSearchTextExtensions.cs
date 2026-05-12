@@ -11,6 +11,14 @@ internal static class LexicalSearchTextExtensions
         "kind", "captured", "summary", "details", "domain"
     ];
 
+    private static readonly KeyValuePair<string, string>[] GermanSearchReplacements =
+    [
+        new("ä", "ae"),
+        new("ö", "oe"),
+        new("ü", "ue"),
+        new("ß", "ss")
+    ];
+
     public static string? FindBestSharedTerm(this VaultIndexedNote source, VaultIndexedNote candidate)
     {
         var titleTerms = candidate.Title.ExtractTerms();
@@ -20,9 +28,10 @@ internal static class LexicalSearchTextExtensions
                 return term;
         }
 
+        var comparableBody = candidate.BodyContent.NormalizeForComparison();
         foreach (var term in source.ExtractedTerms.OrderByDescending(t => t.Length))
         {
-            if (candidate.BodyContent.Contains(term, StringComparison.OrdinalIgnoreCase))
+            if (comparableBody.Contains(term, StringComparison.OrdinalIgnoreCase))
                 return term;
         }
 
@@ -41,7 +50,7 @@ internal static class LexicalSearchTextExtensions
         var start = Math.Max(0, index - LexicalSearchScoringOptions.Default.ExcerptRadius);
         var end = Math.Min(content.Length, index + query.Length + LexicalSearchScoringOptions.Default.ExcerptRadius);
         var snippet = content[start..end].Trim();
-        var collapsed = CollapseWhitespace(snippet);
+        var collapsed = snippet.CollapseWhitespace();
 
         if (start > 0)
             collapsed = "…" + collapsed;
@@ -56,11 +65,11 @@ internal static class LexicalSearchTextExtensions
         var terms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var builder = new StringBuilder();
 
-        foreach (var ch in value)
+        foreach (var ch in value.NormalizeForComparison())
         {
             if (char.IsLetterOrDigit(ch))
             {
-                builder.Append(char.ToLowerInvariant(ch));
+                builder.Append(ch);
                 continue;
             }
 
@@ -71,7 +80,7 @@ internal static class LexicalSearchTextExtensions
         return terms;
     }
 
-    internal static string CollapseWhitespace(string value)
+    internal static string CollapseWhitespace(this string value)
     {
         var builder = new StringBuilder(value.Length);
         var lastWasWhitespace = false;
@@ -94,13 +103,22 @@ internal static class LexicalSearchTextExtensions
         return builder.ToString().Trim();
     }
 
+    internal static string NormalizeForComparison(this string value)
+    {
+        var normalized = value.CollapseWhitespace().ToLowerInvariant();
+        foreach (var replacement in GermanSearchReplacements)
+            normalized = normalized.Replace(replacement.Key, replacement.Value, StringComparison.Ordinal);
+
+        return normalized;
+    }
+
     private static string FirstNonEmptyLine(string content)
     {
         foreach (var line in content.Split('\n'))
         {
             var trimmed = line.Trim();
             if (!string.IsNullOrWhiteSpace(trimmed))
-                return CollapseWhitespace(trimmed);
+                return trimmed.CollapseWhitespace();
         }
 
         return string.Empty;
