@@ -237,6 +237,39 @@ public sealed class MarkdownVaultTests : IDisposable
     }
 
     [Fact]
+    public void ListNotes_refreshes_cached_index_after_external_file_creation()
+    {
+        Directory.CreateDirectory(_root);
+        using var vault = new MarkdownVault(_root);
+
+        vault.ListNotes().Count.Is(0);
+
+        Directory.CreateDirectory(Path.Combine(_root, "glossary"));
+        File.WriteAllText(Path.Combine(_root, "glossary", "order.md"), "# Order\n\nCanonical domain term.");
+
+        WaitUntil(() => vault.ListNotes().Any(note => string.Equals(note.Path, Path.Combine("glossary", "order.md"), StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
+    public void SearchNotes_refreshes_cached_index_after_external_file_change()
+    {
+        Directory.CreateDirectory(_root);
+        File.WriteAllText(Path.Combine(_root, "pricing.md"), "# Pricing\n\nalpha token");
+        using var vault = new MarkdownVault(_root);
+
+        vault.SearchNotes("alpha").Count.Is(1);
+
+        File.WriteAllText(Path.Combine(_root, "pricing.md"), "# Pricing\n\nbeta token");
+
+        WaitUntil(() =>
+        {
+            var betaResults = vault.SearchNotes("beta");
+            var alphaResults = vault.SearchNotes("alpha");
+            return betaResults.Count == 1 && alphaResults.Count == 0;
+        });
+    }
+
+    [Fact]
     public void SearchNotes_prefers_tag_matches_over_body_only_matches()
     {
         Directory.CreateDirectory(Path.Combine(_root, "data-flows"));
@@ -558,6 +591,20 @@ public sealed class MarkdownVaultTests : IDisposable
     {
         if (Directory.Exists(_root))
             Directory.Delete(_root, recursive: true);
+    }
+
+    private static void WaitUntil(Func<bool> condition, int timeoutMs = 5000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition())
+                return;
+
+            Thread.Sleep(50);
+        }
+
+        Assert.True(condition());
     }
 }
 
