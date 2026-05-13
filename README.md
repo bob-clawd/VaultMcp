@@ -81,6 +81,30 @@ That turns session memory into reviewable project memory.
 | `reindex_vault` | Maintenance tool that rebuilds the semantic index from JSON source files under the vault root. Not routine retrieval workflow. |
 | `index_status` | Diagnostics tool for semantic provider and index health, including model, dimensions, chunk count, and warnings. |
 
+## Design direction: UX-first lexicon surface
+
+The current JSON vault and capture model already make knowledge structured and git-friendly, but the likely next UX step is to simplify the public MCP surface around **lexicon-style term lookup first**.
+
+That means future tool design should bias toward questions agents naturally ask:
+
+- what does this term mean?
+- how does term A differ from term B?
+- which terms belong to this area?
+- how do I add or refine a term safely?
+
+The design goal is **UX first, backend second**:
+
+- keep the mental model small
+- make the obvious tool the right tool
+- avoid leaking storage or graph complexity into the public API
+- derive soft navigation such as `seeAlso` instead of over-modeling it up front
+
+A proposed direction for that follow-up lives here:
+
+- `design/LEXICON_API_DIRECTION.md` — proposed lexicon-first API surface and field-origin rules for a future UX-focused iteration
+
+This design direction is intentionally **not implemented in this PR**. This PR keeps the current tool surface stable while moving the vault itself to structured JSON.
+
 ## Knowledge model
 
 `capture_learning` currently supports these canonical knowledge kinds:
@@ -262,6 +286,7 @@ The useful part is the loop itself: retrieval and persistence reinforce each oth
 
 ## Documentation
 
+- `design/LEXICON_API_DIRECTION.md` — proposed UX-first, lexicon-centered follow-up API design
 - `docs/STARTER_VAULT.md` — practical first vault layout
 - `docs/AGENT_RETRIEVAL_WORKFLOW.md` — retrieval rules and prompt snippets
 - `docs/CAPTURE_EXAMPLES.md` — example JSON output shapes
