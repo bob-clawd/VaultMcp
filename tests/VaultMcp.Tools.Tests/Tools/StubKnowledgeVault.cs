@@ -40,6 +40,6 @@ internal sealed class StubKnowledgeVault(
     public VaultCaptureResult CaptureLearning(VaultLearningCapture learning)
     {
         LastCaptureLearning = learning;
-        return captureResult ?? new VaultCaptureResult("glossary/stub.md", learning.Title, learning.Kind, true, false, false, "Stub capture");
+        return captureResult ?? new VaultCaptureResult("glossary/stub.json", learning.Title, learning.Kind, true, false, false, "Stub capture");
     }
 }

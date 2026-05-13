@@ -1,16 +1,14 @@
 using System.Text;
-using VaultMcp.Tools.KnowledgeBase.Vault;
 using VaultMcp.Tools.KnowledgeBase.Search;
 using VaultMcp.Tools.KnowledgeBase.Search.Lexical;
 
-namespace VaultMcp.Tools.KnowledgeBase.Vault.Markdown;
+namespace VaultMcp.Tools.KnowledgeBase.Vault.Json;
 
-public sealed class MarkdownVault : IVault, IDisposable
+public sealed class JsonVault : IVault, IDisposable
 {
     private const int DefaultGetNoteMaxChars = 12000;
-    private const int MaxIndexedCharacters = 64000;
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-    private static readonly string[] Extensions = [".md", ".markdown"];
+    private static readonly string[] Extensions = [".json"];
 
     private readonly ISearch _search;
     private readonly object _sync = new();
@@ -20,12 +18,12 @@ public sealed class MarkdownVault : IVault, IDisposable
     private FileSystemWatcher? _watcher;
     private bool _indexDirty = true;
 
-    public MarkdownVault(string rootPath)
+    public JsonVault(string rootPath)
         : this(rootPath, new LexicalSearch())
     {
     }
 
-    internal MarkdownVault(string rootPath, ISearch search)
+    internal JsonVault(string rootPath, ISearch search)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
         ArgumentNullException.ThrowIfNull(search);
@@ -65,16 +63,24 @@ public sealed class MarkdownVault : IVault, IDisposable
             throw new FileNotFoundException($"Note '{relativePath}' was not found in the vault.", relativePath);
 
         var entry = GetIndexedNote(fullPath);
-        var content = VaultMarkdownParser.StripInternalMarkers(ReadTextUtf8(fullPath, maxChars, out var truncated));
+        var content = entry.BodyContent;
+        var truncated = false;
+        if (content.Length > maxChars)
+        {
+            content = content[..maxChars];
+            truncated = true;
+        }
+
         return new VaultNoteDocument(
             entry.RelativePath,
             entry.Title,
             content,
             truncated,
-            entry.Frontmatter.Kind,
-            entry.Frontmatter.Tags,
-            entry.Frontmatter.Aliases,
-            entry.Headings);
+            entry.Metadata.Kind,
+            entry.Metadata.Tags,
+            entry.Metadata.Aliases,
+            entry.Headings,
+            ReadStructured(fullPath));
     }
 
     public IReadOnlyList<VaultSearchResult> SearchNotes(string query, int maxCount = 10)
@@ -96,28 +102,32 @@ public sealed class MarkdownVault : IVault, IDisposable
         var normalizedKind = learning.Kind.NormalizeKind();
         var title = learning.Title.Trim();
         var tags = learning.Tags.NormalizeTags(normalizedKind);
-        var relativePath = Path.Combine(normalizedKind.MapKindToDirectory(), title.ToSlug() + ".md");
+        var relativePath = Path.Combine(normalizedKind.MapKindToDirectory(), title.ToSlug() + ".json");
         var fullPath = ResolvePath(relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
         if (!File.Exists(fullPath))
         {
-            File.WriteAllText(fullPath, learning.BuildNewNote(title, normalizedKind, tags, DateTimeOffset.UtcNow), Utf8);
+            File.WriteAllText(fullPath, learning.BuildNewNoteJson(title, normalizedKind, tags, DateTimeOffset.UtcNow), Utf8);
             RefreshIndex(fullPath);
             return new VaultCaptureResult(ToRelativePath(fullPath), title, normalizedKind, Created: true, Appended: false, Unchanged: false, Message: "Created new knowledge note.");
         }
 
         var existing = File.ReadAllText(fullPath, Utf8);
-        if (existing.ContainsLearning(learning, normalizedKind, title))
+        var parsed = JsonVaultParser.Parse(existing, Path.GetFileNameWithoutExtension(fullPath));
+        if (parsed.ContainsLearning(learning, normalizedKind, title))
             return new VaultCaptureResult(ToRelativePath(fullPath), title, normalizedKind, Created: false, Appended: false, Unchanged: true, Message: "Learning already present in note.");
 
-        var separator = existing.EndsWith(Environment.NewLine, StringComparison.Ordinal)
-            ? Environment.NewLine
-            : Environment.NewLine + Environment.NewLine;
-        var updated = existing + separator + learning.BuildAppendBlock(normalizedKind, title, DateTimeOffset.UtcNow);
+        var updated = existing.AppendLearningJson(learning, normalizedKind, title, DateTimeOffset.UtcNow);
         File.WriteAllText(fullPath, updated, Utf8);
         RefreshIndex(fullPath);
         return new VaultCaptureResult(ToRelativePath(fullPath), title, normalizedKind, Created: false, Appended: true, Unchanged: false, Message: "Appended learning to existing note.");
+    }
+
+    private VaultStructuredContent ReadStructured(string fullPath)
+    {
+        var raw = File.ReadAllText(fullPath, Utf8);
+        return JsonVaultParser.Parse(raw, Path.GetFileNameWithoutExtension(fullPath)).Structured;
     }
 
     private IReadOnlyList<VaultIndexedNote> GetIndexedNotes()
@@ -174,7 +184,7 @@ public sealed class MarkdownVault : IVault, IDisposable
 
     private VaultIndexedNote GetIndexedNote(string fullPath)
     {
-        var notes = GetIndexedNotes();
+        _ = GetIndexedNotes();
         if (_index.TryGetValue(fullPath, out var note))
             return note;
 
@@ -183,8 +193,9 @@ public sealed class MarkdownVault : IVault, IDisposable
 
     private VaultIndexedNote LoadIndexedNote(string path, FileInfo info)
     {
-        var rawContent = ReadTextUtf8(path, MaxIndexedCharacters, out var truncated);
-        var parsed = VaultMarkdownParser.Parse(rawContent, Path.GetFileNameWithoutExtension(path));
+        var rawContent = File.ReadAllText(path, Utf8).Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+        var truncated = false;
+        var parsed = JsonVaultParser.Parse(rawContent, Path.GetFileNameWithoutExtension(path));
         var terms = string.Join(
                 Environment.NewLine,
                 new[]
@@ -192,8 +203,8 @@ public sealed class MarkdownVault : IVault, IDisposable
                     parsed.Title,
                     parsed.BodyContent,
                     string.Join(Environment.NewLine, parsed.Headings),
-                    string.Join(Environment.NewLine, parsed.Frontmatter.Aliases),
-                    string.Join(Environment.NewLine, parsed.Frontmatter.Tags)
+                    string.Join(Environment.NewLine, parsed.Metadata.Aliases),
+                    string.Join(Environment.NewLine, parsed.Metadata.Tags)
                 })
             .ExtractTerms();
 
@@ -204,7 +215,7 @@ public sealed class MarkdownVault : IVault, IDisposable
             parsed.RawContent,
             parsed.BodyContent,
             parsed.Headings,
-            parsed.Frontmatter,
+            parsed.Metadata,
             terms,
             info.Length,
             info.LastWriteTimeUtc,
@@ -217,6 +228,7 @@ public sealed class MarkdownVault : IVault, IDisposable
             return [];
 
         return Directory.EnumerateFiles(_rootPath, "*", SearchOption.AllDirectories)
+            .Where(path => !path.Contains(Path.Combine(_rootPath, ".vault"), StringComparison.OrdinalIgnoreCase))
             .Where(path => Extensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase));
     }
 
@@ -323,21 +335,9 @@ public sealed class MarkdownVault : IVault, IDisposable
         using var stream = File.OpenRead(path);
         using var reader = new StreamReader(stream, Utf8, detectEncodingFromByteOrderMarks: true);
 
-        var builder = new StringBuilder(Math.Min(maxChars, 8192));
-        var buffer = new char[Math.Min(maxChars, 4096)];
-        var remaining = maxChars;
-
-        while (remaining > 0)
-        {
-            var read = reader.Read(buffer, 0, Math.Min(buffer.Length, remaining));
-            if (read <= 0)
-                break;
-
-            builder.Append(buffer, 0, read);
-            remaining -= read;
-        }
-
-        truncated = !reader.EndOfStream;
-        return builder.ToString();
+        var buffer = new char[maxChars];
+        var read = reader.ReadBlock(buffer, 0, maxChars);
+        truncated = reader.Peek() >= 0;
+        return new string(buffer, 0, read).Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
     }
 }
