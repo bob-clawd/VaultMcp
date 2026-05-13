@@ -11,9 +11,11 @@ internal sealed class StubKnowledgeVault(
     IReadOnlyList<VaultSearchResult>? termResults = null,
     IReadOnlyList<VaultSearchResult>? relatedResults = null,
     VaultCaptureResult? captureResult = null,
+    VaultTermCaptureResult? captureTermResult = null,
     IReadOnlyDictionary<string, VaultNoteDocument>? documentsByPath = null) : IVault
 {
     public VaultLearningCapture? LastCaptureLearning { get; private set; }
+    public VaultTermCapture? LastCaptureTerm { get; private set; }
 
     public VaultStatus GetStatus() => status;
 
@@ -41,5 +43,11 @@ internal sealed class StubKnowledgeVault(
     {
         LastCaptureLearning = learning;
         return captureResult ?? new VaultCaptureResult("glossary/stub.json", learning.Title, learning.Kind, true, false, false, "Stub capture");
+    }
+
+    public VaultTermCaptureResult CaptureTerm(VaultTermCapture term)
+    {
+        LastCaptureTerm = term;
+        return captureTermResult ?? new VaultTermCaptureResult("glossary/stub.json", term.Term, true, false, false, "Stub term capture", term.Aliases, term.Group);
     }
 }

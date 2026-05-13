@@ -49,7 +49,16 @@ internal static class JsonVaultParser
         var bodyContent = JsonVaultRenderer.Render(title, note.Summary, note.Details, structured);
         var headings = JsonVaultRenderer.BuildHeadings(note.Summary, note.Details, structured);
         var learningHashes = learnings.Select(learning => learning.Hash).ToArray();
-        return new JsonParsedNote(rawContent, title, bodyContent, headings, metadata, structured, learningHashes);
+        return new JsonParsedNote(
+            rawContent,
+            title,
+            string.IsNullOrWhiteSpace(note.Summary) ? null : note.Summary.Trim(),
+            string.IsNullOrWhiteSpace(note.Details) ? null : note.Details.Trim(),
+            bodyContent,
+            headings,
+            metadata,
+            structured,
+            learningHashes);
     }
 
     internal static IReadOnlyDictionary<string, string> NormalizeScalars(IReadOnlyDictionary<string, string>? scalars)

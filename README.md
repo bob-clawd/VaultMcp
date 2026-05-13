@@ -58,10 +58,11 @@ docs/domain/
 Agents use that vault through a small retrieval/capture loop:
 
 1. `recall_context` as the default first tool for project, domain, and architecture knowledge
-2. `get_note`
-3. `find_related_notes` if needed
-4. do the actual task
-5. `capture_learning` for durable new knowledge
+2. `explain_term` / `compare_terms` / `list_terms` when the task is clearly lexicon-style
+3. `get_note`
+4. `find_related_notes` if needed
+5. do the actual task
+6. `capture_term` or `capture_learning` for durable new knowledge
 
 Use `search_notes` or `find_term` directly when the agent already knows the exact term, title, or phrase it wants to look up.
 
@@ -71,6 +72,10 @@ That turns session memory into reviewable project memory.
 
 | Tool | Purpose |
 | --- | --- |
+| `explain_term` | Explain one domain term or named concept in a lexicon-style response, including nearby concepts and likely follow-up questions. |
+| `compare_terms` | Compare multiple terms side by side when names are similar or easy to confuse. |
+| `list_terms` | List terms by group or category-style query for quick domain exploration. |
+| `capture_term` | Low-friction lexicon write path for new terms, aliases, and primary group assignment. |
 | `get_note` | Load a structured JSON note by vault-relative path with an explicit character budget. |
 | `search_notes` | Exact lexical search across titles, paths, headings, aliases, tags, kind, and content. Best when the agent already knows the term or phrase it wants. |
 | `find_term` | Glossary-style lookup for canonical domain terms and aliases. |
@@ -83,7 +88,7 @@ That turns session memory into reviewable project memory.
 
 ## Design direction: UX-first lexicon surface
 
-The current JSON vault and capture model already make knowledge structured and git-friendly, but the likely next UX step is to simplify the public MCP surface around **lexicon-style term lookup first**.
+The current JSON vault and capture model already make knowledge structured and git-friendly. This PR also adds a first **lexicon-style term lookup surface** on top of that storage.
 
 That means future tool design should bias toward questions agents naturally ask:
 
@@ -99,11 +104,11 @@ The design goal is **UX first, backend second**:
 - avoid leaking storage or graph complexity into the public API
 - derive soft navigation such as `seeAlso` instead of over-modeling it up front
 
-A proposed direction for that follow-up lives here:
+A broader direction for continuing that UX-first API work lives here:
 
 - `design/LEXICON_API_DIRECTION.md` — proposed lexicon-first API surface and field-origin rules for a future UX-focused iteration
 
-This design direction is intentionally **not implemented in this PR**. This PR keeps the current tool surface stable while moving the vault itself to structured JSON.
+This design note still goes beyond the current implementation. The new lexicon tools are intentionally small; the design doc captures the larger direction without forcing the full model into one jump.
 
 ## Knowledge model
 

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using VaultMcp.Tools.KnowledgeBase.Search;
 using VaultMcp.Tools.KnowledgeBase.Search.Lexical;
 
@@ -9,6 +10,14 @@ public sealed class JsonVault : IVault, IDisposable
     private const int DefaultGetNoteMaxChars = 12000;
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
     private static readonly string[] Extensions = [".json"];
+    private static readonly JsonSerializerOptions JsonSerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true,
+        WriteIndented = true
+    };
 
     private readonly ISearch _search;
     private readonly object _sync = new();
@@ -80,7 +89,9 @@ public sealed class JsonVault : IVault, IDisposable
             entry.Metadata.Tags,
             entry.Metadata.Aliases,
             entry.Headings,
-            ReadStructured(fullPath));
+            ReadStructured(fullPath),
+            ReadSummary(fullPath),
+            ReadDetails(fullPath));
     }
 
     public IReadOnlyList<VaultSearchResult> SearchNotes(string query, int maxCount = 10)
@@ -124,10 +135,83 @@ public sealed class JsonVault : IVault, IDisposable
         return new VaultCaptureResult(ToRelativePath(fullPath), title, normalizedKind, Created: false, Appended: true, Unchanged: false, Message: "Appended learning to existing note.");
     }
 
+    public VaultTermCaptureResult CaptureTerm(VaultTermCapture term)
+    {
+        ArgumentNullException.ThrowIfNull(term);
+        ArgumentException.ThrowIfNullOrWhiteSpace(term.Term);
+        ArgumentException.ThrowIfNullOrWhiteSpace(term.Description);
+
+        var timestamp = DateTimeOffset.UtcNow;
+        var existing = FindExistingTermNote(term.Term, term.Aliases);
+        if (existing is null)
+        {
+            var title = term.Term.Trim();
+            var fullPath = ResolvePath(Path.Combine("glossary", title.ToSlug() + ".json"));
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+
+            var createdNote = BuildLexiconNote(title, term.Description, term.Aliases, term.Group, timestamp);
+            File.WriteAllText(fullPath, JsonSerializer.Serialize(createdNote, JsonSerializerOptions), Utf8);
+            RefreshIndex(fullPath);
+
+            return new VaultTermCaptureResult(
+                ToRelativePath(fullPath),
+                title,
+                Created: true,
+                Updated: false,
+                Unchanged: false,
+                Message: "Created new lexicon term.",
+                createdNote.Aliases,
+                createdNote.Scalars is not null && createdNote.Scalars.TryGetValue("group", out var createdGroup) ? createdGroup : null);
+        }
+
+        var rawContent = File.ReadAllText(existing.FullPath, Utf8);
+        var note = JsonSerializer.Deserialize<JsonVaultNote>(rawContent, JsonSerializerOptions)
+            ?? throw new JsonException("json note is empty or invalid.");
+
+        var updated = MergeLexiconNote(note, term, timestamp, out var changed);
+        if (!changed)
+        {
+            return new VaultTermCaptureResult(
+                existing.RelativePath,
+                string.IsNullOrWhiteSpace(note.Title) ? term.Term.Trim() : note.Title.Trim(),
+                Created: false,
+                Updated: false,
+                Unchanged: true,
+                Message: "Lexicon term already up to date.",
+                note.Aliases,
+                note.Scalars is not null && note.Scalars.TryGetValue("group", out var existingGroup) ? existingGroup : null);
+        }
+
+        File.WriteAllText(existing.FullPath, JsonSerializer.Serialize(updated, JsonSerializerOptions), Utf8);
+        RefreshIndex(existing.FullPath);
+
+        return new VaultTermCaptureResult(
+            existing.RelativePath,
+            updated.Title ?? term.Term.Trim(),
+            Created: false,
+            Updated: true,
+            Unchanged: false,
+            Message: "Updated existing lexicon term.",
+            updated.Aliases,
+            updated.Scalars is not null && updated.Scalars.TryGetValue("group", out var mergedGroup) ? mergedGroup : null);
+    }
+
     private VaultStructuredContent ReadStructured(string fullPath)
     {
         var raw = File.ReadAllText(fullPath, Utf8);
         return JsonVaultParser.Parse(raw, Path.GetFileNameWithoutExtension(fullPath)).Structured;
+    }
+
+    private string? ReadSummary(string fullPath)
+    {
+        var raw = File.ReadAllText(fullPath, Utf8);
+        return JsonVaultParser.Parse(raw, Path.GetFileNameWithoutExtension(fullPath)).Summary;
+    }
+
+    private string? ReadDetails(string fullPath)
+    {
+        var raw = File.ReadAllText(fullPath, Utf8);
+        return JsonVaultParser.Parse(raw, Path.GetFileNameWithoutExtension(fullPath)).Details;
     }
 
     private IReadOnlyList<VaultIndexedNote> GetIndexedNotes()
@@ -329,6 +413,190 @@ public sealed class JsonVault : IVault, IDisposable
     }
 
     private string ToRelativePath(string path) => Path.GetRelativePath(_rootPath, path);
+
+    private VaultIndexedNote? FindExistingTermNote(string term, IReadOnlyList<string>? aliases)
+    {
+        var candidates = GetIndexedNotes()
+            .Where(note => string.Equals(note.Metadata.Kind, "term", StringComparison.OrdinalIgnoreCase)
+                || note.RelativePath.StartsWith("glossary/", StringComparison.OrdinalIgnoreCase)
+                || note.RelativePath.StartsWith("glossary\\", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        var probes = new[] { term }
+            .Concat(aliases ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.NormalizeForComparison())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        foreach (var probe in probes)
+        {
+            var titleMatch = candidates.FirstOrDefault(note =>
+                note.Title.NormalizeForComparison().Equals(probe, StringComparison.OrdinalIgnoreCase)
+                || Path.GetFileNameWithoutExtension(note.RelativePath).NormalizeForComparison().Equals(probe, StringComparison.OrdinalIgnoreCase));
+            if (titleMatch is not null)
+                return titleMatch;
+
+            var aliasMatch = candidates.FirstOrDefault(note => note.Metadata.Aliases.Any(alias => alias.NormalizeForComparison().Equals(probe, StringComparison.OrdinalIgnoreCase)));
+            if (aliasMatch is not null)
+                return aliasMatch;
+        }
+
+        return null;
+    }
+
+    private static JsonVaultNote BuildLexiconNote(string title, string description, IReadOnlyList<string>? aliases, string? group, DateTimeOffset timestamp)
+    {
+        var normalizedAliases = NormalizeAliases(aliases, title);
+        var (summary, details) = SplitDescription(description);
+        var scalars = string.IsNullOrWhiteSpace(group)
+            ? null
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["group"] = group.Trim() };
+
+        return new JsonVaultNote(
+            Schema: "vault-note/v1",
+            Id: $"term.{title.ToSlug()}",
+            Kind: "term",
+            Title: title.Trim(),
+            Summary: summary,
+            Details: details,
+            Tags: ["domain", "term"],
+            Aliases: normalizedAliases.Length == 0 ? null : normalizedAliases,
+            Related: null,
+            Confidence: null,
+            Scalars: scalars,
+            Lists: null,
+            Sections: null,
+            Learnings: null,
+            Meta: new JsonVaultMeta(timestamp, timestamp));
+    }
+
+    private static JsonVaultNote MergeLexiconNote(JsonVaultNote note, VaultTermCapture capture, DateTimeOffset timestamp, out bool changed)
+    {
+        var title = string.IsNullOrWhiteSpace(note.Title) ? capture.Term.Trim() : note.Title.Trim();
+        var existingDescription = CombineDescription(note.Summary, note.Details);
+        var mergedDescription = MergeDescription(existingDescription, capture.Description);
+        var (summary, details) = SplitDescription(mergedDescription);
+
+        var existingAliases = NormalizeAliases(note.Aliases, title);
+        var incomingAliases = NormalizeAliases(capture.Aliases, title);
+        var mergedAliases = existingAliases
+            .Concat(incomingAliases)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var mergedScalars = note.Scalars is null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(note.Scalars, StringComparer.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(capture.Group) && !mergedScalars.ContainsKey("group"))
+            mergedScalars["group"] = capture.Group.Trim();
+
+        var normalizedExistingDescription = existingDescription.NormalizeForComparison();
+        var normalizedMergedDescription = mergedDescription.NormalizeForComparison();
+        var existingGroup = note.Scalars is not null && note.Scalars.TryGetValue("group", out var group) ? group : null;
+
+        changed = !string.Equals(normalizedExistingDescription, normalizedMergedDescription, StringComparison.Ordinal)
+            || !existingAliases.SequenceEqual(mergedAliases, StringComparer.OrdinalIgnoreCase)
+            || (!string.IsNullOrWhiteSpace(capture.Group) && string.IsNullOrWhiteSpace(existingGroup));
+
+        if (!changed)
+            return note;
+
+        return note with
+        {
+            Schema = string.IsNullOrWhiteSpace(note.Schema) ? "vault-note/v1" : note.Schema,
+            Id = string.IsNullOrWhiteSpace(note.Id) ? $"term.{title.ToSlug()}" : note.Id,
+            Kind = string.IsNullOrWhiteSpace(note.Kind) ? "term" : note.Kind,
+            Title = title,
+            Summary = summary,
+            Details = details,
+            Tags = MergeTags(note.Tags, "domain", "term"),
+            Aliases = mergedAliases.Length == 0 ? null : mergedAliases,
+            Scalars = mergedScalars.Count == 0 ? null : mergedScalars,
+            Meta = note.Meta is null
+                ? new JsonVaultMeta(timestamp, timestamp)
+                : note.Meta with { UpdatedAt = timestamp }
+        };
+    }
+
+    private static string[] MergeTags(IReadOnlyList<string>? existing, params string[] additions)
+        => (existing ?? [])
+            .Concat(additions)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => tag.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static string[] NormalizeAliases(IReadOnlyList<string>? aliases, string title)
+        => (aliases ?? [])
+            .Where(alias => !string.IsNullOrWhiteSpace(alias))
+            .Select(alias => alias.Trim())
+            .Where(alias => !alias.Equals(title, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static string CombineDescription(string? summary, string? details)
+    {
+        if (string.IsNullOrWhiteSpace(summary))
+            return details?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(details))
+            return summary.Trim();
+        return $"{summary.Trim()}\n\n{details.Trim()}";
+    }
+
+    private static string MergeDescription(string existing, string incoming)
+    {
+        var normalizedExisting = existing.NormalizeForComparison();
+        var normalizedIncoming = incoming.NormalizeForComparison();
+
+        if (string.IsNullOrWhiteSpace(existing))
+            return incoming.Trim();
+        if (string.IsNullOrWhiteSpace(incoming))
+            return existing.Trim();
+        if (normalizedExisting.Equals(normalizedIncoming, StringComparison.Ordinal))
+            return existing.Trim();
+        if (normalizedExisting.Contains(normalizedIncoming, StringComparison.Ordinal))
+            return existing.Trim();
+        if (normalizedIncoming.Contains(normalizedExisting, StringComparison.Ordinal))
+            return incoming.Trim();
+
+        return $"{existing.Trim()}\n\n{incoming.Trim()}";
+    }
+
+    private static (string Summary, string? Details) SplitDescription(string description)
+    {
+        var normalized = description.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+            return (string.Empty, null);
+
+        var sentenceEnd = FindSentenceBoundary(normalized);
+        if (sentenceEnd <= 0 || sentenceEnd >= normalized.Length)
+            return (normalized, null);
+
+        var summary = normalized[..sentenceEnd].Trim();
+        var details = normalized[sentenceEnd..].Trim();
+        return string.IsNullOrWhiteSpace(details)
+            ? (summary, null)
+            : (summary, details);
+    }
+
+    private static int FindSentenceBoundary(string text)
+    {
+        const int maxSummaryLength = 180;
+        for (var index = 0; index < text.Length && index < maxSummaryLength; index++)
+        {
+            var ch = text[index];
+            if (ch is '.' or '!' or '?')
+                return index + 1;
+        }
+
+        if (text.Length <= maxSummaryLength)
+            return text.Length;
+
+        var whitespaceBoundary = text.LastIndexOf(' ', maxSummaryLength);
+        return whitespaceBoundary > 0 ? whitespaceBoundary : maxSummaryLength;
+    }
 
     private static string ReadTextUtf8(string path, int maxChars, out bool truncated)
     {

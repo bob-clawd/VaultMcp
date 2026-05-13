@@ -42,6 +42,8 @@ internal sealed record JsonVaultMeta(
 internal sealed record JsonParsedNote(
     string RawContent,
     string Title,
+    string? Summary,
+    string? Details,
     string BodyContent,
     IReadOnlyList<string> Headings,
     VaultMetadata Metadata,

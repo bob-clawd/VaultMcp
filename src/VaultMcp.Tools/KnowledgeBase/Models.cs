@@ -19,7 +19,9 @@ public sealed record VaultNoteDocument(
     IReadOnlyList<string>? Tags = null,
     IReadOnlyList<string>? Aliases = null,
     IReadOnlyList<string>? Headings = null,
-    VaultStructuredContent? Structured = null);
+    VaultStructuredContent? Structured = null,
+    string? Summary = null,
+    string? Details = null);
 
 public sealed record VaultStructuredContent(
     IReadOnlyDictionary<string, string>? Scalars = null,
@@ -58,6 +60,22 @@ public sealed record VaultCaptureResult(
     bool Appended,
     bool Unchanged,
     string Message);
+
+public sealed record VaultTermCapture(
+    string Term,
+    string Description,
+    IReadOnlyList<string>? Aliases = null,
+    string? Group = null);
+
+public sealed record VaultTermCaptureResult(
+    string Path,
+    string Title,
+    bool Created,
+    bool Updated,
+    bool Unchanged,
+    string Message,
+    IReadOnlyList<string>? Aliases = null,
+    string? Group = null);
 
 public sealed record VaultLearningCapture(
     string Kind,
